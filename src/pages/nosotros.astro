@@ -1,0 +1,314 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const team = [
+  {
+    name: "Dr. Juan Carlos Rodríguez",
+    specialty: "Odontólogo General",
+    education: "Universidad Nacional de Colombia",
+    experience: "15+ años",
+    certifications: ["Implantología Avanzada", "Estética Dental"]
+  },
+  {
+    name: "Dra. María Fernanda Gómez",
+    specialty: "Ortodoncista",
+    education: "Pontificia Universidad Javeriana",
+    experience: "12+ años",
+    certifications: ["Ortodoncia Invisible", "Brackets Autoligables"]
+  },
+  {
+    name: "Dr. Andrés Martínez",
+    specialty: "Endodoncista",
+    education: "Universidad El Bosque",
+    experience: "10+ años",
+    certifications: ["Endodoncia Microscópica", "Tratamientos de Conducto"]
+  }
+];
+
+const values = [
+  {
+    icon: "🎯",
+    title: "Excelencia",
+    description: "Comprometidos con la más alta calidad en cada tratamiento"
+  },
+  {
+    icon: "❤️",
+    title: "Empatía",
+    description: "Entendemos tus necesidades y miedos, te acompañamos en todo el proceso"
+  },
+  {
+    icon: "💡",
+    title: "Innovación",
+    description: "Tecnología de punta y técnicas más avanzadas del mercado"
+  },
+  {
+    icon: "🤝",
+    title: "Confianza",
+    description: "Transparencia total en diagnósticos, tratamientos y costos"
+  }
+];
+---
+
+<Layout
+  title="Sobre Nosotros - Clínica Dental"
+  description="Conoce a nuestro equipo de odontólogos especialistas. Más de 15 años cuidando sonrisas con tecnología de punta."
+>
+  <!-- Hero -->
+  <section class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">
+          Sobre Nosotros
+        </h1>
+        <p class="text-xl text-blue-100">
+          Más de 15 años transformando vidas a través de sonrisas saludables y hermosas
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Nuestra Historia -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        
+        <!-- Texto -->
+        <div>
+          <h2 class="text-4xl font-bold text-gray-900 mb-6">
+            Nuestra Historia
+          </h2>
+          
+          <div class="space-y-4 text-gray-700 leading-relaxed text-lg">
+            <p>
+              Fundada en 2009, nuestra clínica nació con una misión clara: <strong class="text-blue-600">hacer que el cuidado dental de calidad sea accesible para todos</strong>.
+            </p>
+            
+            <p>
+              Lo que comenzó como un pequeño consultorio con 2 especialistas, hoy es una clínica moderna que ha atendido a más de <strong>5,000 pacientes felices</strong>.
+            </p>
+            
+            <p>
+              Nos enorgullece haber transformado no solo sonrisas, sino vidas completas. Cada paciente que sale con una sonrisa renovada nos motiva a seguir mejorando día a día.
+            </p>
+
+            <p>
+              Nuestra filosofía es simple: <strong class="text-blue-600">tratamiento personalizado, tecnología de punta, y atención humana</strong>. No somos una clínica más, somos tu aliado en salud dental.
+            </p>
+          </div>
+
+          <div class="mt-8 grid grid-cols-3 gap-6">
+            <div class="text-center">
+              <div class="text-4xl font-bold text-blue-600 mb-2">2009</div>
+              <div class="text-sm text-gray-600">Año de Fundación</div>
+            </div>
+            <div class="text-center">
+              <div class="text-4xl font-bold text-blue-600 mb-2">5,000+</div>
+              <div class="text-sm text-gray-600">Pacientes Atendidos</div>
+            </div>
+            <div class="text-center">
+              <div class="text-4xl font-bold text-blue-600 mb-2">98%</div>
+              <div class="text-sm text-gray-600">Satisfacción</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Imagen placeholder -->
+        <div class="bg-gradient-to-br from-blue-200 to-blue-400 rounded-2xl aspect-square flex items-center justify-center shadow-2xl">
+          <div class="text-center p-8">
+            <div class="text-9xl mb-4">🏥</div>
+            <p class="text-white text-xl font-semibold">Nuestra Clínica</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Nuestros Valores -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          Nuestros Valores
+        </h2>
+        <p class="text-xl text-gray-600">
+          Los principios que guían cada decisión que tomamos
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {values.map((value) => (
+          <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all hover:-translate-y-2 text-center border border-gray-100">
+            <div class="text-6xl mb-4">{value.icon}</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3">{value.title}</h3>
+            <p class="text-gray-600 leading-relaxed">{value.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Nuestro Equipo -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          Nuestro Equipo
+        </h2>
+        <p class="text-xl text-gray-600">
+          Especialistas certificados comprometidos con tu salud dental
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-12">
+        {team.map((member) => (
+          <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all">
+            
+            <!-- Foto placeholder -->
+            <div class="aspect-square bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+              <div class="text-9xl">👨‍⚕️</div>
+            </div>
+
+            <!-- Info -->
+            <div class="p-8">
+              <h3 class="text-2xl font-bold text-gray-900 mb-2">{member.name}</h3>
+              <p class="text-blue-600 font-semibold mb-4">{member.specialty}</p>
+              
+              <div class="space-y-3 text-sm text-gray-700">
+                <div class="flex items-start space-x-2">
+                  <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                  </svg>
+                  <span><strong>Educación:</strong> {member.education}</span>
+                </div>
+
+                <div class="flex items-start space-x-2">
+                  <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <span><strong>Experiencia:</strong> {member.experience}</span>
+                </div>
+
+                <div class="pt-3 border-t border-gray-200">
+                  <strong class="text-gray-900 block mb-2">Certificaciones:</strong>
+                  <ul class="space-y-1">
+                    {member.certifications.map((cert) => (
+                      <li class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm">{cert}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Tecnología -->
+  <section class="py-20 bg-blue-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          Tecnología de Punta
+        </h2>
+        <p class="text-xl text-gray-600">
+          Equipos modernos para tratamientos precisos y menos invasivos
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="bg-white rounded-xl p-6 shadow-lg text-center">
+          <div class="text-5xl mb-4">📸</div>
+          <h3 class="font-bold text-lg mb-2">Rayos X Digitales</h3>
+          <p class="text-sm text-gray-600">90% menos radiación que sistemas tradicionales</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-lg text-center">
+          <div class="text-5xl mb-4">🔬</div>
+          <h3 class="font-bold text-lg mb-2">Microscopio Dental</h3>
+          <p class="text-sm text-gray-600">Precisión quirúrgica en endodoncias</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-lg text-center">
+          <div class="text-5xl mb-4">💻</div>
+          <h3 class="font-bold text-lg mb-2">Diseño Digital 3D</h3>
+          <p class="text-sm text-gray-600">Simulación de resultados antes del tratamiento</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-lg text-center">
+          <div class="text-5xl mb-4">🦷</div>
+          <h3 class="font-bold text-lg mb-2">Scanner Intraoral</h3>
+          <p class="text-sm text-gray-600">Adiós a las molestias de impresiones tradicionales</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Instalaciones -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          Nuestras Instalaciones
+        </h2>
+        <p class="text-xl text-gray-600">
+          Ambiente cómodo, moderno y totalmente higienizado
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-gradient-to-br from-blue-200 to-blue-400 rounded-2xl aspect-video flex items-center justify-center">
+          <div class="text-center">
+            <div class="text-7xl mb-2">🏥</div>
+            <p class="text-white font-semibold">Sala de Espera</p>
+          </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-300 to-blue-500 rounded-2xl aspect-video flex items-center justify-center">
+          <div class="text-center">
+            <div class="text-7xl mb-2">🦷</div>
+            <p class="text-white font-semibold">Consultorios</p>
+          </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl aspect-video flex items-center justify-center">
+          <div class="text-center">
+            <div class="text-7xl mb-2">🔬</div>
+            <p class="text-white font-semibold">Laboratorio</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl font-bold mb-6">
+        ¿Quieres conocernos en persona?
+      </h2>
+      <p class="text-xl text-blue-100 mb-10">
+        Agenda una cita y descubre por qué miles de pacientes confían en nosotros
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a 
+          href="/agendar-cita"
+          class="bg-white text-blue-600 px-10 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 hover:scale-105"
+        >
+          Agendar Consulta Gratis
+        </a>
+        <a 
+          href="/contacto"
+          class="bg-blue-500 text-white px-10 py-4 rounded-lg font-semibold hover:bg-blue-400 transition-all duration-300 border-2 border-white/30"
+        >
+          Ver Ubicación
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

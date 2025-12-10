@@ -1,0 +1,211 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+const blogPosts = [
+  {
+    id: 1,
+    title: "¿Cuánto cuesta un blanqueamiento dental en Bogotá? Precios 2025",
+    excerpt: "Guía completa de precios, tipos de blanqueamiento y cuál elegir según tu presupuesto. Información actualizada 2025.",
+    category: "Precios",
+    date: "15 Enero 2025",
+    readTime: "5 min lectura",
+    slug: "cuanto-cuesta-blanqueamiento-dental-bogota",
+    image: "🦷"
+  },
+  {
+    id: 2,
+    title: "Ortodoncia: Brackets vs Invisalign - ¿Cuál es mejor para ti?",
+    excerpt: "Comparativa completa entre brackets tradicionales y ortodoncia invisible. Ventajas, desventajas, precios y resultados.",
+    category: "Ortodoncia",
+    date: "10 Enero 2025",
+    readTime: "8 min lectura",
+    slug: "brackets-vs-invisalign-cual-elegir",
+    image: "🦷"
+  },
+  {
+    id: 3,
+    title: "5 señales de que necesitas una limpieza dental urgente",
+    excerpt: "Descubre los síntomas que indican que debes agendar una limpieza profesional lo antes posible para evitar problemas mayores.",
+    category: "Prevención",
+    date: "5 Enero 2025",
+    readTime: "4 min lectura",
+    slug: "senales-necesitas-limpieza-dental",
+    image: "🦷"
+  },
+  {
+    id: 4,
+    title: "Implantes dentales: Todo lo que necesitas saber",
+    excerpt: "Procedimiento completo, duración, cuidados post-operatorios, costos y preguntas frecuentes sobre implantes dentales.",
+    category: "Implantes",
+    date: "28 Diciembre 2024",
+    readTime: "10 min lectura",
+    slug: "guia-completa-implantes-dentales",
+    image: "🦷"
+  },
+  {
+    id: 5,
+    title: "Cómo cuidar tus dientes si usas brackets: Guía completa",
+    excerpt: "Tips de higiene, alimentos permitidos, qué evitar y cómo mantener tus brackets limpios durante todo el tratamiento.",
+    category: "Ortodoncia",
+    date: "20 Diciembre 2024",
+    readTime: "6 min lectura",
+    slug: "cuidado-dientes-brackets",
+    image: "🦷"
+  },
+  {
+    id: 6,
+    title: "¿Dolor de muelas? Causas y soluciones inmediatas",
+    excerpt: "Qué hacer cuando tienes dolor dental, remedios caseros temporales y cuándo debes acudir al dentista urgentemente.",
+    category: "Urgencias",
+    date: "15 Diciembre 2024",
+    readTime: "5 min lectura",
+    slug: "dolor-de-muelas-que-hacer",
+    image: "🦷"
+  }
+];
+
+const categories = ["Todos", "Precios", "Ortodoncia", "Prevención", "Implantes", "Urgencias"];
+---
+
+<Layout
+  title="Blog - Clínica Dental | Consejos y Guías de Salud Dental"
+  description="Artículos, guías y consejos sobre salud dental. Aprende sobre tratamientos, precios, cuidados y prevención."
+>
+  <!-- Hero -->
+  <section class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">
+          Blog de Salud Dental
+        </h1>
+        <p class="text-xl text-blue-100">
+          Consejos, guías y todo lo que necesitas saber para cuidar tu sonrisa
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorías -->
+  <section class="py-8 bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-wrap gap-3 justify-center">
+        {categories.map((category) => (
+          <button
+            class="px-6 py-2 rounded-full border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-600 hover:text-white transition-all"
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Artículos del Blog -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {blogPosts.map((post) => (
+          <article class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-2xl transition-all hover:-translate-y-2">
+            
+            <!-- Imagen placeholder -->
+            <div class="aspect-video bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+              <span class="text-9xl">{post.image}</span>
+            </div>
+
+            <!-- Contenido -->
+            <div class="p-6">
+              <!-- Categoría y fecha -->
+              <div class="flex items-center justify-between mb-3">
+                <span class="inline-block bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-xs font-semibold">
+                  {post.category}
+                </span>
+                <span class="text-xs text-gray-500">{post.date}</span>
+              </div>
+
+              <!-- Título -->
+              <h2 class="text-xl font-bold text-gray-900 mb-3 leading-tight hover:text-blue-600 transition-colors">
+                <a href={`/blog/${post.slug}`}>
+                  {post.title}
+                </a>
+              </h2>
+
+              <!-- Extracto -->
+              <p class="text-gray-600 mb-4 leading-relaxed text-sm">
+                {post.excerpt}
+              </p>
+
+              <!-- Footer -->
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500 flex items-center">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  {post.readTime}
+                </span>
+                <a 
+                  href={`/blog/${post.slug}`}
+                  class="text-blue-600 font-semibold text-sm hover:underline flex items-center"
+                >
+                  Leer más
+                  <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Newsletter -->
+  <section class="py-20 bg-blue-600 text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">
+        📧 Suscríbete a nuestro Newsletter
+      </h2>
+      <p class="text-xl text-blue-100 mb-8">
+        Recibe consejos de salud dental y ofertas exclusivas cada mes
+      </p>
+      
+      <form class="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+        <input
+          type="email"
+          placeholder="tu@email.com"
+          class="flex-1 px-6 py-4 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-white"
+          required
+        />
+        <button
+          type="submit"
+          class="bg-white text-blue-600 px-8 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+        >
+          Suscribirme
+        </button>
+      </form>
+      
+      <p class="text-sm text-blue-200 mt-4">
+        No spam. Puedes desuscribirte cuando quieras.
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20 bg-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl font-bold text-gray-900 mb-6">
+        ¿Necesitas agendar una cita?
+      </h2>
+      <p class="text-xl text-gray-600 mb-10">
+        Primera consulta completamente GRATIS
+      </p>
+      <a 
+        href="/agendar-cita"
+        class="inline-block bg-blue-600 text-white px-10 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:scale-105 shadow-lg"
+      >
+        Agendar Cita Gratis
+      </a>
+    </div>
+  </section>
+</Layout>

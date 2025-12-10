@@ -1,0 +1,303 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { services } from "../data/services-simple";
+import { testimonials } from "../data/testimonials-simple";
+---
+
+<Layout
+  title="Clínica Dental - Tu Sonrisa Perfecta en Bogotá"
+  description="Más de 15 años cuidando sonrisas. Limpieza dental, blanqueamiento, ortodoncia, implantes. Agenda tu cita hoy. Primera consulta GRATIS."
+>
+  <!-- Hero Section -->
+  <section class="relative bg-gradient-to-r from-blue-600 to-blue-800 text-white overflow-hidden">
+    <div class="absolute inset-0 bg-black opacity-10"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+      <div class="grid md:grid-cols-2 gap-12 items-center">
+        
+        <!-- Contenido -->
+        <div class="space-y-8 animate-fade-in-up">
+          <div class="inline-block bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium">
+            ✨ Primera consulta GRATIS
+          </div>
+          
+          <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+            Tu sonrisa perfecta
+            <span class="block text-blue-200">comienza aquí</span>
+          </h1>
+          
+          <p class="text-xl text-blue-100 leading-relaxed">
+            Más de 15 años transformando sonrisas con tecnología de punta 
+            y atención personalizada. Agenda tu cita hoy mismo.
+          </p>
+
+          <!-- CTAs -->
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a 
+              href="/agendar-cita"
+              class="bg-white text-blue-600 px-8 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 hover:scale-105 shadow-xl text-center"
+            >
+              Agendar Cita Ahora
+            </a>
+            <a 
+              href="tel:+573102278592"
+              class="bg-blue-500 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-400 transition-all duration-300 border-2 border-white/30 text-center"
+            >
+              📞 Llamar Ahora
+            </a>
+          </div>
+
+          <!-- Stats -->
+          <div class="grid grid-cols-3 gap-6 pt-8">
+            <div class="text-center">
+              <div class="text-3xl font-bold">15+</div>
+              <div class="text-sm text-blue-200">Años Experiencia</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold">5,000+</div>
+              <div class="text-sm text-blue-200">Pacientes Felices</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold">4.9★</div>
+              <div class="text-sm text-blue-200">Calificación</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Imagen (placeholder) -->
+        <div class="hidden md:block">
+          <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
+            <div class="aspect-square bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-9xl">
+              😁
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wave decoration -->
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="white"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- Servicios Destacados -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Header -->
+      <div class="text-center mb-16">
+        <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          Nuestros Servicios
+        </h2>
+        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+          Tratamientos dentales completos con la mejor tecnología
+        </p>
+      </div>
+
+      <!-- Grid de servicios -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {services.slice(0, 4).map((service) => (
+          <div class="group bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-gray-100">
+            <!-- Icono -->
+            <div class="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors">
+              <span class="text-4xl group-hover:scale-110 transition-transform">{service.icon}</span>
+            </div>
+            
+            <!-- Contenido -->
+            <h3 class="text-xl font-bold text-gray-900 mb-3">
+              {service.name}
+            </h3>
+            
+            <p class="text-gray-600 mb-4 leading-relaxed">
+              {service.description}
+            </p>
+
+            <!-- Precio -->
+            <div class="flex items-center justify-between">
+              <span class="text-2xl font-bold text-blue-600">
+                ${service.price.toLocaleString()}
+              </span>
+              <a 
+                href="/agendar-cita"
+                class="text-blue-600 font-semibold hover:underline flex items-center"
+              >
+                Agendar
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- CTA -->
+      <div class="text-center mt-12">
+        <a 
+          href="/servicios"
+          class="inline-flex items-center space-x-2 text-blue-600 font-semibold hover:underline text-lg"
+        >
+          <span>Ver todos los servicios</span>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Por qué elegirnos -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          ¿Por qué elegirnos?
+        </h2>
+        <p class="text-xl text-gray-600">
+          Nos diferenciamos por nuestro compromiso con tu salud dental
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <!-- Razón 1 -->
+        <div class="text-center">
+          <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold mb-4">Tecnología de Punta</h3>
+          <p class="text-gray-600 leading-relaxed">
+            Equipos modernos de última generación para tratamientos precisos y menos invasivos
+          </p>
+        </div>
+
+        <!-- Razón 2 -->
+        <div class="text-center">
+          <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold mb-4">Especialistas Certificados</h3>
+          <p class="text-gray-600 leading-relaxed">
+            Odontólogos con más de 15 años de experiencia y certificaciones internacionales
+          </p>
+        </div>
+
+        <!-- Razón 3 -->
+        <div class="text-center">
+          <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold mb-4">Horarios Flexibles</h3>
+          <p class="text-gray-600 leading-relaxed">
+            Abierto de lunes a sábado con citas disponibles en la mañana, tarde y noche
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonios -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">
+          Lo que dicen nuestros pacientes
+        </h2>
+        <p class="text-xl text-gray-600">
+          Miles de sonrisas transformadas y satisfechas
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        {testimonials.slice(0, 3).map((testimonial) => (
+          <div class="bg-gray-50 rounded-2xl p-8 shadow-lg">
+            <!-- Rating -->
+            <div class="flex space-x-1 mb-4">
+              {[...Array(5)].map(() => (
+                <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+              ))}
+            </div>
+
+            <!-- Testimonio -->
+            <p class="text-gray-700 mb-6 leading-relaxed italic">
+              "{testimonial.text}"
+            </p>
+
+            <!-- Autor -->
+            <div class="flex items-center space-x-4">
+              <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                {testimonial.author.charAt(0)}
+              </div>
+              <div>
+                <div class="font-semibold text-gray-900">{testimonial.author}</div>
+                <div class="text-sm text-gray-600">{testimonial.service}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Final -->
+  <section class="py-20 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-4xl md:text-5xl font-bold mb-6">
+        ¿Listo para tu mejor sonrisa?
+      </h2>
+      <p class="text-xl text-blue-100 mb-10">
+        Agenda tu cita hoy y recibe una valoración completamente GRATIS
+      </p>
+      
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a 
+          href="/agendar-cita"
+          class="bg-white text-blue-600 px-10 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 hover:scale-105 shadow-xl"
+        >
+          Agendar Cita Gratis
+        </a>
+        <a 
+          href="https://wa.me/573102278592"
+          target="_blank"
+          class="bg-green-500 text-white px-10 py-4 rounded-lg font-semibold hover:bg-green-600 transition-all duration-300 flex items-center justify-center space-x-2"
+        >
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+          </svg>
+          <span>WhatsApp</span>
+        </a>
+      </div>
+
+      <p class="mt-8 text-blue-200 text-sm">
+        📍 Cra 15 #93-20, Bogotá | 📞 310 227 8592 | 📧 info@clinicadental.com
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.8s ease-out;
+  }
+</style>
