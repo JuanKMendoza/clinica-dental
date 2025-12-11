@@ -4,33 +4,43 @@ import { supabase } from "../../lib/supabase";
 
 // Obtener todas las citas ordenadas por fecha
 const { data: appointments } = await supabase
-  .from('appointments')
-  .select(`
+  .from("appointments")
+  .select(
+    `
     *,
     services (name, duration, price),
     businesses (name)
-  `)
-  .order('appointment_date', { ascending: true })
-  .order('appointment_time', { ascending: true });
+  `
+  )
+  .order("appointment_date", { ascending: true })
+  .order("appointment_time", { ascending: true });
 
 // Contar por estado
-const pending = appointments?.filter(a => a.status === 'pending').length || 0;
-const confirmed = appointments?.filter(a => a.status === 'confirmed').length || 0;
-const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 0;
+const pending = appointments?.filter((a) => a.status === "pending").length || 0;
+const confirmed =
+  appointments?.filter((a) => a.status === "confirmed").length || 0;
+const cancelled =
+  appointments?.filter((a) => a.status === "cancelled").length || 0;
+const completed = 
+  appointments?.filter(a => a.status === 'completed').length || 0;
 ---
 
 <Layout title="Admin Panel - Gestión de Citas">
   <div class="min-h-screen bg-gray-100 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      
       <!-- Header -->
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <div class="flex justify-between items-center">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Panel de Administración</h1>
+            <h1 class="text-3xl font-bold text-gray-900">
+              Panel de Administración
+            </h1>
             <p class="text-gray-600 mt-1">Gestión de citas y clientes</p>
           </div>
-          <a href="/" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+          <a
+            href="/"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
             ← Volver al sitio
           </a>
         </div>
@@ -42,11 +52,23 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm">Total Citas</p>
-              <p class="text-3xl font-bold text-gray-900">{appointments?.length || 0}</p>
+              <p class="text-3xl font-bold text-gray-900">
+                {appointments?.length || 0}
+              </p>
             </div>
             <div class="bg-blue-100 p-3 rounded-full">
-              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              <svg
+                class="w-8 h-8 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                ></path>
               </svg>
             </div>
           </div>
@@ -59,8 +81,17 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
               <p class="text-3xl font-bold text-yellow-600">{pending}</p>
             </div>
             <div class="bg-yellow-100 p-3 rounded-full">
-              <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              <svg
+                class="w-8 h-8 text-yellow-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
           </div>
@@ -73,8 +104,17 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
               <p class="text-3xl font-bold text-green-600">{confirmed}</p>
             </div>
             <div class="bg-green-100 p-3 rounded-full">
-              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              <svg
+                class="w-8 h-8 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
           </div>
@@ -87,12 +127,43 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
               <p class="text-3xl font-bold text-red-600">{cancelled}</p>
             </div>
             <div class="bg-red-100 p-3 rounded-full">
-              <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              <svg
+                class="w-8 h-8 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </div>
           </div>
         </div>
+        <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm">Completadas</p>
+            <p class="text-3xl font-bold text-blue-600">{completed}</p>
+          </div>
+          <div class="bg-blue-100 p-3 rounded-full">
+            <svg
+              class="w-8 h-8 text-blue-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
       </div>
 
       <!-- Tabla de Citas -->
@@ -100,89 +171,169 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
         <div class="p-6 border-b border-gray-200">
           <h2 class="text-xl font-bold text-gray-900">Todas las Citas</h2>
         </div>
-        
+
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Fecha/Hora
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Cliente
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Contacto
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Servicio
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Estado
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              {appointments && appointments.map((apt) => (
-                <tr class="hover:bg-gray-50">
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">
-                      {new Date(apt.appointment_date).toLocaleDateString('es-CO')}
-                    </div>
-                    <div class="text-sm text-gray-500">{apt.appointment_time}</div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="text-sm font-medium text-gray-900">{apt.customer_name}</div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="text-sm text-gray-900">📞 {apt.customer_phone}</div>
-                    {apt.customer_email && (
-                      <div class="text-sm text-gray-500">📧 {apt.customer_email}</div>
-                    )}
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="text-sm text-gray-900">{apt.services?.name || 'N/A'}</div>
-                    <div class="text-sm text-gray-500">{apt.services?.duration || 0} min</div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      apt.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      apt.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {apt.status === 'pending' ? 'Pendiente' :
-                       apt.status === 'confirmed' ? 'Confirmada' : 'Cancelada'}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <button 
-                      data-id={apt.id}
-                      data-action="confirm"
-                      class="text-green-600 hover:text-green-900 mr-3 font-medium"
-                    >
-                      ✓ Confirmar
-                    </button>
-                    <button 
-                      data-id={apt.id}
-                      data-action="cancel"
-                      class="text-red-600 hover:text-red-900 font-medium"
-                    >
-                      ✗ Cancelar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {
+                appointments &&
+                  appointments.map((apt) => (
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">
+                          {new Date(apt.appointment_date).toLocaleDateString(
+                            "es-CO"
+                          )}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                          {apt.appointment_time}
+                        </div>
+                      </td>
+                      <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">
+                          {apt.customer_name}
+                        </div>
+                      </td>
+                      <td class="px-6 py-4">
+                        <div class="text-sm text-gray-900">
+                          📞 {apt.customer_phone}
+                        </div>
+                        {apt.customer_email && (
+                          <div class="text-sm text-gray-500">
+                            📧 {apt.customer_email}
+                          </div>
+                        )}
+                      </td>
+                      <td class="px-6 py-4">
+                        <div class="text-sm text-gray-900">
+                          {apt.services?.name || "N/A"}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                          {apt.services?.duration || 0} min
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap">
+                        <span
+                          class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            apt.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : apt.status === "confirmed"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {apt.status === "pending"
+                            ? "Pendiente"
+                            : apt.status === "confirmed"
+                              ? "Confirmada"
+                              : "Cancelada"}
+                        </span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        {/* === SI LA CITA ESTÁ PENDIENTE === */}
+                        {apt.status === "pending" && (
+                          <>
+                            {/* Mostrar botón Confirmar */}
+                            <button
+                              data-id={apt.id}
+                              data-action="confirm"
+                              class="text-green-600 hover:text-green-900 mr-3 font-medium"
+                            >
+                              ✓ Confirmar
+                            </button>
+
+                            {/* Mostrar botón Cancelar */}
+                            <button
+                              data-id={apt.id}
+                              data-action="cancel"
+                              class="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              ✗ Cancelar
+                            </button>
+                          </>
+                        )}
+
+                        {/* === SI LA CITA ESTÁ CONFIRMADA === */}
+                        {apt.status === "confirmed" && (
+                          <>
+                            {/* Mostrar botón Completar (nuevo) */}
+                            <button
+                              data-id={apt.id}
+                              data-action="complete"
+                              class="text-blue-600 hover:text-blue-900 mr-3 font-medium"
+                            >
+                              ✅ Completar
+                            </button>
+
+                            {/* Por si el paciente no viene, puede cancelar */}
+                            <button
+                              data-id={apt.id}
+                              data-action="cancel"
+                              class="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              ✗ Cancelar
+                            </button>
+                          </>
+                        )}
+
+                        {/* === SI LA CITA YA ESTÁ COMPLETADA === */}
+                        {apt.status === "completed" && (
+                          <span class="text-gray-500 italic">Completada ✓</span>
+                        )}
+
+                        {/* === SI LA CITA FUE CANCELADA === */}
+                        {apt.status === "cancelled" && (
+                          <span class="text-gray-500 italic">Cancelada ✗</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+              }
             </tbody>
           </table>
-          
-          {!appointments || appointments.length === 0 && (
-            <div class="text-center py-12">
-              <p class="text-gray-500">No hay citas registradas aún</p>
-            </div>
-          )}
+
+          {
+            !appointments ||
+              (appointments.length === 0 && (
+                <div class="text-center py-12">
+                  <p class="text-gray-500">No hay citas registradas aún</p>
+                </div>
+              ))
+          }
         </div>
       </div>
     </div>
@@ -190,31 +341,48 @@ const cancelled = appointments?.filter(a => a.status === 'cancelled').length || 
 </Layout>
 
 <script>
-  import { supabase } from '../../lib/supabase';
+  import { supabase } from "../../lib/supabase";
 
-  // Manejar acciones de confirmar/cancelar
-  document.addEventListener('click', async (e) => {
+  document.addEventListener("click", async (e) => {
     const target = e.target as HTMLElement;
-    
+
+    // Solo procesar si el elemento tiene data-action
     if (target.dataset.action) {
       const id = target.dataset.id;
       const action = target.dataset.action;
-      
-      if (!confirm(`¿Estás seguro de ${action === 'confirm' ? 'confirmar' : 'cancelar'} esta cita?`)) {
-        return;
+
+      // === MENSAJES PERSONALIZADOS POR ACCIÓN ===
+      const messages = {
+        confirm: "¿Confirmar esta cita?",
+        cancel: "¿Cancelar esta cita?",
+        complete: "¿Marcar como completada? (el paciente ya vino)",
+      };
+
+      // Mostrar confirmación al admin
+      if (!confirm(messages[action as keyof typeof messages])) {
+        return; // Si cancela, salir
       }
-      
-      const newStatus = action === 'confirm' ? 'confirmed' : 'cancelled';
-      
+
+      // === MAPEAR ACCIÓN → ESTADO EN BD ===
+      const statusMap = {
+        confirm: "confirmed", // acción "confirm" → estado "confirmed"
+        cancel: "cancelled", // acción "cancel" → estado "cancelled"
+        complete: "completed", // acción "complete" → estado "completed"
+      };
+
+      const newStatus = statusMap[action as keyof typeof statusMap];
+
+      // === ACTUALIZAR EN SUPABASE ===
       const { error } = await supabase
-        .from('appointments')
-        .update({ status: newStatus })
-        .eq('id', id);
-      
+        .from("appointments")
+        .update({ status: newStatus }) // Actualizar columna "status"
+        .eq("id", id); // WHERE id = id
+
+      // === MANEJAR RESULTADO ===
       if (error) {
-        alert('Error al actualizar: ' + error.message);
+        alert("Error al actualizar: " + error.message);
       } else {
-        // Recargar página para ver cambios
+        // Éxito: recargar para ver cambios
         window.location.reload();
       }
     }
