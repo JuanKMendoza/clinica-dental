@@ -2,7 +2,22 @@
 import Layout from "../../layouts/Layout.astro";
 import { supabase } from "../../lib/supabase";
 
+// === 1. AUTENTICACIÓN SERVIDOR (El Puente) ===
+// Recuperamos las cookies que guardó el Login
+const accessToken = Astro.cookies.get("sb-access-token")?.value;
+const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
+
+// Si existen, se las damos a Supabase para que sepa que somos nosotros
+if (accessToken && refreshToken) {
+  await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+}
+// ============================================
+
 // Obtener todas las citas ordenadas por fecha
+// (Ahora Supabase SÍ devolverá datos porque ya tiene la sesión)
 const { data: appointments } = await supabase
   .from("appointments")
   .select(
@@ -17,17 +32,16 @@ const { data: appointments } = await supabase
 
 // Contar por estado
 const pending = appointments?.filter((a) => a.status === "pending").length || 0;
-const confirmed =
-  appointments?.filter((a) => a.status === "confirmed").length || 0;
-const cancelled =
-  appointments?.filter((a) => a.status === "cancelled").length || 0;
-const completed = 
-  appointments?.filter(a => a.status === 'completed').length || 0;
+const confirmed = appointments?.filter((a) => a.status === "confirmed").length || 0;
+const cancelled = appointments?.filter((a) => a.status === "cancelled").length || 0;
+const completed = appointments?.filter((a) => a.status === 'completed').length || 0;
 ---
 
 <Layout title="Admin Panel - Gestión de Citas">
-  <div class="min-h-screen bg-gray-100 py-8">
+  <!-- Ocultamos el cuerpo inicialmente -->
+  <div id="main-content" class="min-h-screen bg-gray-100 py-8 hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
       <!-- Header -->
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <div class="flex justify-between items-center">
@@ -37,12 +51,16 @@ const completed =
             </h1>
             <p class="text-gray-600 mt-1">Gestión de citas y clientes</p>
           </div>
-          <a
-            href="/"
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            ← Volver al sitio
-          </a>
+          
+          <div class="flex space-x-4">
+            <a href="/" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center">
+                ← Volver al sitio
+            </a>
+            
+            <button id="logout-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+                🚪 Cerrar Sesión
+            </button>
+          </div>
         </div>
       </div>
 
@@ -52,25 +70,9 @@ const completed =
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm">Total Citas</p>
-              <p class="text-3xl font-bold text-gray-900">
-                {appointments?.length || 0}
-              </p>
+              <p class="text-3xl font-bold text-gray-900">{appointments?.length || 0}</p>
             </div>
-            <div class="bg-blue-100 p-3 rounded-full">
-              <svg
-                class="w-8 h-8 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                ></path>
-              </svg>
-            </div>
+            <div class="bg-blue-100 p-3 rounded-full"><span class="text-2xl text-blue-600">📅</span></div>
           </div>
         </div>
 
@@ -80,20 +82,7 @@ const completed =
               <p class="text-gray-600 text-sm">Pendientes</p>
               <p class="text-3xl font-bold text-yellow-600">{pending}</p>
             </div>
-            <div class="bg-yellow-100 p-3 rounded-full">
-              <svg
-                class="w-8 h-8 text-yellow-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
+            <div class="bg-yellow-100 p-3 rounded-full"><span class="text-2xl text-yellow-600">⏳</span></div>
           </div>
         </div>
 
@@ -103,20 +92,7 @@ const completed =
               <p class="text-gray-600 text-sm">Confirmadas</p>
               <p class="text-3xl font-bold text-green-600">{confirmed}</p>
             </div>
-            <div class="bg-green-100 p-3 rounded-full">
-              <svg
-                class="w-8 h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
+            <div class="bg-green-100 p-3 rounded-full"><span class="text-2xl text-green-600">✓</span></div>
           </div>
         </div>
 
@@ -126,44 +102,19 @@ const completed =
               <p class="text-gray-600 text-sm">Canceladas</p>
               <p class="text-3xl font-bold text-red-600">{cancelled}</p>
             </div>
-            <div class="bg-red-100 p-3 rounded-full">
-              <svg
-                class="w-8 h-8 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </div>
+            <div class="bg-red-100 p-3 rounded-full"><span class="text-2xl text-red-600">✗</span></div>
           </div>
         </div>
+        
         <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-gray-600 text-sm">Completadas</p>
-            <p class="text-3xl font-bold text-blue-600">{completed}</p>
-          </div>
-          <div class="bg-blue-100 p-3 rounded-full">
-            <svg
-              class="w-8 h-8 text-blue-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"></path>
-            </svg>
-          </div>
+            <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-600 text-sm">Completadas</p>
+                <p class="text-3xl font-bold text-blue-600">{completed}</p>
+            </div>
+            <div class="bg-blue-100 p-3 rounded-full"><span class="text-2xl text-blue-600">✅</span></div>
+            </div>
         </div>
-      </div>
       </div>
 
       <!-- Tabla de Citas -->
@@ -176,36 +127,12 @@ const completed =
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Fecha/Hora
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Cliente
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Contacto
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Servicio
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Estado
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Acciones
-                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -215,125 +142,57 @@ const completed =
                     <tr class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
-                          {new Date(apt.appointment_date).toLocaleDateString(
-                            "es-CO"
-                          )}
+                          {new Date(apt.appointment_date).toLocaleDateString("es-CO")}
                         </div>
-                        <div class="text-sm text-gray-500">
-                          {apt.appointment_time}
-                        </div>
+                        <div class="text-sm text-gray-500">{apt.appointment_time}</div>
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm font-medium text-gray-900">
-                          {apt.customer_name}
-                        </div>
+                        <div class="text-sm font-medium text-gray-900">{apt.customer_name}</div>
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900">
-                          📞 {apt.customer_phone}
-                        </div>
-                        {apt.customer_email && (
-                          <div class="text-sm text-gray-500">
-                            📧 {apt.customer_email}
-                          </div>
-                        )}
+                        <div class="text-sm text-gray-900">📞 {apt.customer_phone}</div>
+                        {apt.customer_email && <div class="text-sm text-gray-500">📧 {apt.customer_email}</div>}
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900">
-                          {apt.services?.name || "N/A"}
-                        </div>
-                        <div class="text-sm text-gray-500">
-                          {apt.services?.duration || 0} min
-                        </div>
+                        <div class="text-sm text-gray-900">{apt.services?.name || "N/A"}</div>
+                        <div class="text-sm text-gray-500">{apt.services?.duration || 0} min</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
-                        <span
-                          class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            apt.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : apt.status === "confirmed"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {apt.status === "pending"
-                            ? "Pendiente"
-                            : apt.status === "confirmed"
-                              ? "Confirmada"
-                              : "Cancelada"}
+                        <span class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          apt.status === "pending" ? "bg-yellow-100 text-yellow-800" : 
+                          apt.status === "confirmed" ? "bg-green-100 text-green-800" : 
+                          apt.status === "completed" ? "bg-blue-100 text-blue-800" : 
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {apt.status === "pending" ? "Pendiente" : 
+                           apt.status === "confirmed" ? "Confirmada" : 
+                           apt.status === "completed" ? "Completada" : "Cancelada"}
                         </span>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm">
-                        {/* === SI LA CITA ESTÁ PENDIENTE === */}
                         {apt.status === "pending" && (
                           <>
-                            {/* Mostrar botón Confirmar */}
-                            <button
-                              data-id={apt.id}
-                              data-action="confirm"
-                              class="text-green-600 hover:text-green-900 mr-3 font-medium"
-                            >
-                              ✓ Confirmar
-                            </button>
-
-                            {/* Mostrar botón Cancelar */}
-                            <button
-                              data-id={apt.id}
-                              data-action="cancel"
-                              class="text-red-600 hover:text-red-900 font-medium"
-                            >
-                              ✗ Cancelar
-                            </button>
+                            <button data-id={apt.id} data-action="confirm" class="text-green-600 hover:text-green-900 mr-3 font-medium">✓ Confirmar</button>
+                            <button data-id={apt.id} data-action="cancel" class="text-red-600 hover:text-red-900 font-medium">✗ Cancelar</button>
                           </>
                         )}
-
-                        {/* === SI LA CITA ESTÁ CONFIRMADA === */}
                         {apt.status === "confirmed" && (
                           <>
-                            {/* Mostrar botón Completar (nuevo) */}
-                            <button
-                              data-id={apt.id}
-                              data-action="complete"
-                              class="text-blue-600 hover:text-blue-900 mr-3 font-medium"
-                            >
-                              ✅ Completar
-                            </button>
-
-                            {/* Por si el paciente no viene, puede cancelar */}
-                            <button
-                              data-id={apt.id}
-                              data-action="cancel"
-                              class="text-red-600 hover:text-red-900 font-medium"
-                            >
-                              ✗ Cancelar
-                            </button>
+                            <button data-id={apt.id} data-action="complete" class="text-blue-600 hover:text-blue-900 mr-3 font-medium">✅ Completar</button>
+                            <button data-id={apt.id} data-action="cancel" class="text-red-600 hover:text-red-900 font-medium">✗ Cancelar</button>
                           </>
                         )}
-
-                        {/* === SI LA CITA YA ESTÁ COMPLETADA === */}
-                        {apt.status === "completed" && (
-                          <span class="text-gray-500 italic">Completada ✓</span>
-                        )}
-
-                        {/* === SI LA CITA FUE CANCELADA === */}
-                        {apt.status === "cancelled" && (
-                          <span class="text-gray-500 italic">Cancelada ✗</span>
-                        )}
+                        {apt.status === "completed" && <span class="text-gray-500 italic">Completada ✓</span>}
+                        {apt.status === "cancelled" && <span class="text-gray-500 italic">Cancelada ✗</span>}
                       </td>
                     </tr>
                   ))
               }
             </tbody>
           </table>
-
-          {
-            !appointments ||
-              (appointments.length === 0 && (
-                <div class="text-center py-12">
-                  <p class="text-gray-500">No hay citas registradas aún</p>
-                </div>
-              ))
-          }
+          {!appointments || (appointments.length === 0 && (
+            <div class="text-center py-12"><p class="text-gray-500">No hay citas registradas aún</p></div>
+          ))}
         </div>
       </div>
     </div>
@@ -343,48 +202,66 @@ const completed =
 <script>
   import { supabase } from "../../lib/supabase";
 
+  // === PROTECCIÓN DE CLIENTE ===
+  async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+        window.location.href = '/admin/login';
+    } else {
+        const content = document.getElementById('main-content');
+        if (content) content.classList.remove('hidden');
+    }
+  }
+  checkAuth();
+
+  // === GESTIÓN DE CITAS ===
   document.addEventListener("click", async (e) => {
     const target = e.target as HTMLElement;
 
-    // Solo procesar si el elemento tiene data-action
     if (target.dataset.action) {
       const id = target.dataset.id;
       const action = target.dataset.action;
 
-      // === MENSAJES PERSONALIZADOS POR ACCIÓN ===
       const messages = {
         confirm: "¿Confirmar esta cita?",
         cancel: "¿Cancelar esta cita?",
-        complete: "¿Marcar como completada? (el paciente ya vino)",
+        complete: "¿Marcar como completada?",
       };
 
-      // Mostrar confirmación al admin
-      if (!confirm(messages[action as keyof typeof messages])) {
-        return; // Si cancela, salir
-      }
+      // @ts-ignore
+      if (!confirm(messages[action])) return;
 
-      // === MAPEAR ACCIÓN → ESTADO EN BD ===
       const statusMap = {
-        confirm: "confirmed", // acción "confirm" → estado "confirmed"
-        cancel: "cancelled", // acción "cancel" → estado "cancelled"
-        complete: "completed", // acción "complete" → estado "completed"
+        confirm: "confirmed",
+        cancel: "cancelled",
+        complete: "completed",
       };
 
-      const newStatus = statusMap[action as keyof typeof statusMap];
+      // @ts-ignore
+      const newStatus = statusMap[action];
 
-      // === ACTUALIZAR EN SUPABASE ===
       const { error } = await supabase
         .from("appointments")
-        .update({ status: newStatus }) // Actualizar columna "status"
-        .eq("id", id); // WHERE id = id
+        .update({ status: newStatus }) 
+        .eq("id", id); 
 
-      // === MANEJAR RESULTADO ===
-      if (error) {
-        alert("Error al actualizar: " + error.message);
-      } else {
-        // Éxito: recargar para ver cambios
-        window.location.reload();
-      }
+      if (error) alert("Error: " + error.message);
+      else window.location.reload();
     }
   });
+
+  // === CERRAR SESIÓN ===
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+        if(confirm('¿Seguro que quieres cerrar sesión?')) {
+            await supabase.auth.signOut();
+            // Borramos cookies para que el servidor también sepa que salimos
+            document.cookie = "sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+            document.cookie = "sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+            window.location.href = '/admin/login';
+        }
+    });
+  }
 </script>

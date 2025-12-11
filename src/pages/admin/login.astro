@@ -5,43 +5,24 @@ import Layout from "../../layouts/Layout.astro";
 <Layout title="Admin Login">
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
     <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-      <h1 class="text-2xl font-bold mb-6">Acceso Administrativo</h1>
+      <h1 class="text-2xl font-bold mb-6 text-center">Acceso Administrativo</h1>
       
       <form id="login-form" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Email
-          </label>
-          <input
-            type="email"
-            id="email"
-            required
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
-            placeholder="admin@clinica.com"
-          />
+          <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <input type="email" name="email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600" placeholder="admin@clinica.com" />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Contraseña
-          </label>
-          <input
-            type="password"
-            id="password"
-            required
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
-            placeholder="••••••••"
-          />
+          <label class="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+          <input type="password" name="password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600" placeholder="••••••••" />
         </div>
 
-        <button
-          type="submit"
-          class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-        >
+        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
           Iniciar Sesión
         </button>
 
-        <div id="error-message" class="hidden text-red-600 text-sm"></div>
+        <div id="error-message" class="hidden text-red-600 text-sm text-center"></div>
       </form>
     </div>
   </div>
@@ -50,27 +31,42 @@ import Layout from "../../layouts/Layout.astro";
 <script>
   import { supabase } from '../../lib/supabase';
 
-  const form = document.getElementById('login-form') as HTMLFormElement;
+  const form = document.getElementById('login-form');
   const errorMsg = document.getElementById('error-message');
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    const email = (document.getElementById('email') as HTMLInputElement).value;
-    const password = (document.getElementById('password') as HTMLInputElement).value;
+      const formData = new FormData(e.target as HTMLFormElement);
+      const email = formData.get('email')?.toString();
+      const password = formData.get('password')?.toString();
 
-    // Login con Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+      if (!email || !password) return;
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        if (errorMsg) {
+            errorMsg.textContent = 'Email o contraseña incorrectos';
+            errorMsg.classList.remove('hidden');
+        }
+      } else {
+        // === AQUÍ ESTÁ LA SOLUCIÓN ===
+        // Guardamos el token en una COOKIE para que el servidor (Dashboard) pueda leerlo
+        const { access_token, refresh_token } = data.session;
+        
+        // Cookie de acceso (dura 1 hora)
+        document.cookie = `sb-access-token=${access_token}; path=/; max-age=3600; SameSite=Lax`;
+        // Cookie de refresco (dura 1 hora)
+        document.cookie = `sb-refresh-token=${refresh_token}; path=/; max-age=3600; SameSite=Lax`;
+
+        // Ahora sí redirigimos
+        window.location.href = '/admin/dashboard';
+      }
     });
-
-    if (error) {
-      errorMsg!.textContent = 'Email o contraseña incorrectos';
-      errorMsg!.classList.remove('hidden');
-    } else {
-      // Redirigir al dashboard
-      window.location.href = '/admin/dashboard';
-    }
-  });
+  }
 </script>
