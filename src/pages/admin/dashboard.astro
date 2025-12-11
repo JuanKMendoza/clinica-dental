@@ -2,6 +2,15 @@
 import Layout from "../../layouts/Layout.astro";
 import { supabase } from "../../lib/supabase";
 
+// === PROTECCIÓN DE RUTA ===
+// Verificar si hay una sesión activa
+const { data: { session } } = await supabase.auth.getSession();
+
+// Si NO hay sesión, redirigir al login
+if (!session) {
+  return Astro.redirect('/admin/login');
+}
+
 // Obtener todas las citas ordenadas por fecha
 const { data: appointments } = await supabase
   .from("appointments")
@@ -26,25 +35,31 @@ const completed =
 ---
 
 <Layout title="Admin Panel - Gestión de Citas">
-  <div class="min-h-screen bg-gray-100 py-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- Header -->
-      <div class="bg-white rounded-lg shadow p-6 mb-6">
-        <div class="flex justify-between items-center">
-          <div>
-            <h1 class="text-3xl font-bold text-gray-900">
-              Panel de Administración
-            </h1>
-            <p class="text-gray-600 mt-1">Gestión de citas y clientes</p>
-          </div>
-          <a
-            href="/"
-            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            ← Volver al sitio
-          </a>
-        </div>
-      </div>
+  <div class="bg-white rounded-lg shadow p-6 mb-6">
+  <div class="flex justify-between items-center">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Panel de Administración</h1>
+      <p class="text-gray-600 mt-1">
+        Bienvenido, {session.user.email} {/* Mostrar email del usuario */}
+      </p>
+    </div>
+    
+    <div class="flex space-x-4">
+      {/* Botón volver al sitio */}
+      <a href="/" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+        ← Volver al sitio
+      </a>
+      
+      {/* NUEVO: Botón cerrar sesión */}
+      <button 
+        id="logout-btn"
+        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+      >
+        🚪 Cerrar Sesión
+      </button>
+    </div>
+  </div>
+</div>
 
       <!-- Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -387,4 +402,19 @@ const completed =
       }
     }
   });
+
+  const logoutBtn = document.getElementById('logout-btn');
+  
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      // Confirmar que quiere salir
+      if (confirm('¿Cerrar sesión?')) {
+        // Cerrar sesión en Supabase
+        await supabase.auth.signOut();
+        
+        // Redirigir al login
+        window.location.href = '/admin/login';
+      }
+    });
+  }
 </script>
