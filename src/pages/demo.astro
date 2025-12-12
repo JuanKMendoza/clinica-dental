@@ -1,0 +1,102 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Demo - Sistema de Citas">
+  <div class="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 text-white">
+    <div class="max-w-4xl mx-auto px-4 py-20">
+      
+      <!-- Hero -->
+      <div class="text-center mb-16">
+        <h1 class="text-5xl font-bold mb-6">
+          Sistema de Gestión de Citas
+        </h1>
+        <p class="text-xl text-blue-100 mb-8">
+          Digitaliza tu negocio en 24 horas. Sin complicaciones.
+        </p>
+        <div class="flex justify-center gap-4">
+          <a href="/agendar-cita" class="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold hover:bg-blue-50">
+            Ver Demo Cliente
+          </a>
+          <a href="/admin/login" class="bg-blue-800 text-white px-8 py-4 rounded-lg font-bold hover:bg-blue-900">
+            Ver Demo Admin
+          </a>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="grid md:grid-cols-2 gap-8 mb-16">
+        <div class="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
+          <h3 class="text-2xl font-bold mb-4">📱 Para tus Clientes</h3>
+          <ul class="space-y-2">
+            <li>✓ Agendan citas 24/7 desde su celular</li>
+            <li>✓ Ven horarios disponibles en tiempo real</li>
+            <li>✓ Reciben confirmación por email/WhatsApp</li>
+            <li>✓ No necesitan instalar nada</li>
+          </ul>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
+          <h3 class="text-2xl font-bold mb-4">💼 Para Ti (Admin)</h3>
+          <ul class="space-y-2">
+            <li>✓ Panel de control completo</li>
+            <li>✓ Confirma, cancela o completa citas</li>
+            <li>✓ Filtros por fecha, estado, cliente</li>
+            <li>✓ Exporta a Excel para reportes</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Pricing -->
+      <div class="bg-white text-gray-900 p-8 rounded-lg shadow-2xl">
+        <h2 class="text-3xl font-bold text-center mb-8">Inversión</h2>
+        
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Opción 1 -->
+          <div class="border-2 border-blue-600 p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-4">Setup Único</h3>
+            <p class="text-4xl font-bold text-blue-600 mb-4">$1.8M - 2.5M</p>
+            <ul class="space-y-2 mb-6">
+              <li>✓ Instalación completa</li>
+              <li>✓ Personalización</li>
+              <li>✓ Capacitación 2 horas</li>
+              <li>✓ Dominio y hosting incluido</li>
+              <li>✓ 30 días soporte gratis</li>
+            </ul>
+            <button class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">
+              Contratar
+            </button>
+          </div>
+
+          <!-- Opción 2 -->
+          <div class="border-2 border-green-600 p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-4">Suscripción Mensual</h3>
+            <p class="text-4xl font-bold text-green-600 mb-4">$250k - 400k/mes</p>
+            <ul class="space-y-2 mb-6">
+              <li>✓ Sin costo inicial</li>
+              <li>✓ Actualizaciones incluidas</li>
+              <li>✓ Soporte técnico 24/7</li>
+              <li>✓ Backups automáticos</li>
+              <li>✓ Cancela cuando quieras</li>
+            </ul>
+            <button class="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
+              Contratar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="text-center mt-16">
+        <p class="text-xl mb-4">¿Listo para digitalizar tu negocio?</p>
+        <a 
+          href="https://wa.me/573102278592?text=Hola!%20Quiero%20info%20sobre%20el%20sistema%20de%20citas"
+          target="_blank"
+          class="inline-block bg-green-500 text-white px-8 py-4 rounded-lg font-bold hover:bg-green-600"
+        >
+          💬 Contactar por WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+</Layout>

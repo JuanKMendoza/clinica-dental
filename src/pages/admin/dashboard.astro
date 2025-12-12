@@ -32,21 +32,24 @@ const { data: appointments } = await supabase
 
 // Contar por estado
 const pending = appointments?.filter((a) => a.status === "pending").length || 0;
-const confirmed = appointments?.filter((a) => a.status === "confirmed").length || 0;
-const cancelled = appointments?.filter((a) => a.status === "cancelled").length || 0;
-const completed = appointments?.filter((a) => a.status === 'completed').length || 0;
+const confirmed =
+  appointments?.filter((a) => a.status === "confirmed").length || 0;
+const cancelled =
+  appointments?.filter((a) => a.status === "cancelled").length || 0;
+const completed =
+  appointments?.filter((a) => a.status === "completed").length || 0;
 ---
 
 <Layout title="Admin Panel - Gestión de Citas">
   <!-- Ocultamos el cuerpo inicialmente -->
   <div id="main-content" class="min-h-screen bg-gray-100 py-8 hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      
       <!-- Header -->
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <!-- flex-col en móvil (columna), md:flex-row en escritorio (fila) -->
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-          
+        <div
+          class="flex flex-col md:flex-row justify-between items-center gap-4"
+        >
           <!-- Título y Texto -->
           <div class="text-center md:text-left w-full md:w-auto">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
@@ -54,22 +57,22 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
             </h1>
             <p class="text-gray-600 mt-1">Gestión de citas y clientes</p>
           </div>
-          
+
           <!-- Botones -->
           <!--Ancho completo en móvil, botones apilados o flexibles -->
           <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <a
-                href="/"
-                class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center justify-center text-center transition-colors"
+              href="/"
+              class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center justify-center text-center transition-colors"
             >
-                ← Volver al sitio
+              ← Volver al sitio
             </a>
-            
+
             <button
-                id="logout-btn"
-                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 text-center transition-colors"
+              id="logout-btn"
+              class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 text-center transition-colors"
             >
-                🚪 Cerrar Sesión
+              🚪 Cerrar Sesión
             </button>
           </div>
         </div>
@@ -81,9 +84,13 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-600 text-sm">Total Citas</p>
-              <p class="text-3xl font-bold text-gray-900">{appointments?.length || 0}</p>
+              <p class="text-3xl font-bold text-gray-900">
+                {appointments?.length || 0}
+              </p>
             </div>
-            <div class="bg-blue-100 p-3 rounded-full"><span class="text-2xl text-blue-600">📅</span></div>
+            <div class="bg-blue-100 p-3 rounded-full">
+              <span class="text-2xl text-blue-600">📅</span>
+            </div>
           </div>
         </div>
 
@@ -93,7 +100,9 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
               <p class="text-gray-600 text-sm">Pendientes</p>
               <p class="text-3xl font-bold text-yellow-600">{pending}</p>
             </div>
-            <div class="bg-yellow-100 p-3 rounded-full"><span class="text-2xl text-yellow-600">⏳</span></div>
+            <div class="bg-yellow-100 p-3 rounded-full">
+              <span class="text-2xl text-yellow-600">⏳</span>
+            </div>
           </div>
         </div>
 
@@ -103,7 +112,9 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
               <p class="text-gray-600 text-sm">Confirmadas</p>
               <p class="text-3xl font-bold text-green-600">{confirmed}</p>
             </div>
-            <div class="bg-green-100 p-3 rounded-full"><span class="text-2xl text-green-600">✓</span></div>
+            <div class="bg-green-100 p-3 rounded-full">
+              <span class="text-2xl text-green-600">✓</span>
+            </div>
           </div>
         </div>
 
@@ -113,18 +124,88 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
               <p class="text-gray-600 text-sm">Canceladas</p>
               <p class="text-3xl font-bold text-red-600">{cancelled}</p>
             </div>
-            <div class="bg-red-100 p-3 rounded-full"><span class="text-2xl text-red-600">✗</span></div>
+            <div class="bg-red-100 p-3 rounded-full">
+              <span class="text-2xl text-red-600">✗</span>
+            </div>
           </div>
         </div>
-        
+
         <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-600 text-sm">Completadas</p>
-                <p class="text-3xl font-bold text-blue-600">{completed}</p>
+              <p class="text-gray-600 text-sm">Completadas</p>
+              <p class="text-3xl font-bold text-blue-600">{completed}</p>
             </div>
-            <div class="bg-blue-100 p-3 rounded-full"><span class="text-2xl text-blue-600">✅</span></div>
+            <div class="bg-blue-100 p-3 rounded-full">
+              <span class="text-2xl text-blue-600">✅</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros y Búsqueda -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Filtros</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- Filtro por fecha -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2"
+              >Fecha</label
+            >
+            <select id="filter-date" class="w-full px-4 py-2 border rounded-lg">
+              <option value="all">Todas</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta semana</option>
+              <option value="month">Este mes</option>
+            </select>
+          </div>
+
+          <!-- Filtro por estado -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2"
+              >Estado</label
+            >
+            <select
+              id="filter-status"
+              class="w-full px-4 py-2 border rounded-lg"
+            >
+              <option value="all">Todos</option>
+              <option value="pending">Pendientes</option>
+              <option value="confirmed">Confirmadas</option>
+              <option value="completed">Completadas</option>
+              <option value="cancelled">Canceladas</option>
+            </select>
+          </div>
+
+          <!-- Búsqueda -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2"
+              >Buscar</label
+            >
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Nombre o teléfono..."
+              class="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+
+          <!-- Botones de acción -->
+          <div class="flex items-end gap-2">
+            <button
+              id="clear-filters"
+              class="px-4 py-2 text-blue-600 hover:underline"
+            >
+              Limpiar
+            </button>
+            <button
+              id="export-excel"
+              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              📊 Excel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -138,12 +219,30 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
           <table class="w-full">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Servicio</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Fecha/Hora</th
+                >
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Cliente</th
+                >
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Contacto</th
+                >
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Servicio</th
+                >
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Estado</th
+                >
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >Acciones</th
+                >
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -153,57 +252,115 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
                     <tr class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
-                          {new Date(apt.appointment_date).toLocaleDateString("es-CO")}
+                          {new Date(apt.appointment_date).toLocaleDateString(
+                            "es-CO"
+                          )}
                         </div>
-                        <div class="text-sm text-gray-500">{apt.appointment_time}</div>
+                        <div class="text-sm text-gray-500">
+                          {apt.appointment_time}
+                        </div>
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm font-medium text-gray-900">{apt.customer_name}</div>
+                        <div class="text-sm font-medium text-gray-900">
+                          {apt.customer_name}
+                        </div>
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900">📞 {apt.customer_phone}</div>
-                        {apt.customer_email && <div class="text-sm text-gray-500">📧 {apt.customer_email}</div>}
+                        <div class="text-sm text-gray-900">
+                          📞 {apt.customer_phone}
+                        </div>
+                        {apt.customer_email && (
+                          <div class="text-sm text-gray-500">
+                            📧 {apt.customer_email}
+                          </div>
+                        )}
                       </td>
                       <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900">{apt.services?.name || "N/A"}</div>
-                        <div class="text-sm text-gray-500">{apt.services?.duration || 0} min</div>
+                        <div class="text-sm text-gray-900">
+                          {apt.services?.name || "N/A"}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                          {apt.services?.duration || 0} min
+                        </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
-                        <span class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          apt.status === "pending" ? "bg-yellow-100 text-yellow-800" : 
-                          apt.status === "confirmed" ? "bg-green-100 text-green-800" : 
-                          apt.status === "completed" ? "bg-blue-100 text-blue-800" : 
-                          "bg-red-100 text-red-800"
-                        }`}>
-                          {apt.status === "pending" ? "Pendiente" : 
-                           apt.status === "confirmed" ? "Confirmada" : 
-                           apt.status === "completed" ? "Completada" : "Cancelada"}
+                        <span
+                          class={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            apt.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : apt.status === "confirmed"
+                                ? "bg-green-100 text-green-800"
+                                : apt.status === "completed"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {apt.status === "pending"
+                            ? "Pendiente"
+                            : apt.status === "confirmed"
+                              ? "Confirmada"
+                              : apt.status === "completed"
+                                ? "Completada"
+                                : "Cancelada"}
                         </span>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm">
                         {apt.status === "pending" && (
                           <>
-                            <button data-id={apt.id} data-action="confirm" class="text-green-600 hover:text-green-900 mr-3 font-medium">✓ Confirmar</button>
-                            <button data-id={apt.id} data-action="cancel" class="text-red-600 hover:text-red-900 font-medium">✗ Cancelar</button>
+                            <button
+                              data-id={apt.id}
+                              data-action="confirm"
+                              class="text-green-600 hover:text-green-900 mr-3 font-medium"
+                            >
+                              ✓ Confirmar
+                            </button>
+                            <button
+                              data-id={apt.id}
+                              data-action="cancel"
+                              class="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              ✗ Cancelar
+                            </button>
                           </>
                         )}
                         {apt.status === "confirmed" && (
                           <>
-                            <button data-id={apt.id} data-action="complete" class="text-blue-600 hover:text-blue-900 mr-3 font-medium">✅ Completar</button>
-                            <button data-id={apt.id} data-action="cancel" class="text-red-600 hover:text-red-900 font-medium">✗ Cancelar</button>
+                            <button
+                              data-id={apt.id}
+                              data-action="complete"
+                              class="text-blue-600 hover:text-blue-900 mr-3 font-medium"
+                            >
+                              ✅ Completar
+                            </button>
+                            <button
+                              data-id={apt.id}
+                              data-action="cancel"
+                              class="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              ✗ Cancelar
+                            </button>
                           </>
                         )}
-                        {apt.status === "completed" && <span class="text-gray-500 italic">Completada ✓</span>}
-                        {apt.status === "cancelled" && <span class="text-gray-500 italic">Cancelada ✗</span>}
+                        {apt.status === "completed" && (
+                          <span class="text-gray-500 italic">Completada ✓</span>
+                        )}
+                        {apt.status === "cancelled" && (
+                          <span class="text-gray-500 italic">Cancelada ✗</span>
+                        )}
                       </td>
                     </tr>
                   ))
               }
             </tbody>
           </table>
-          {!appointments || (appointments.length === 0 && (
-            <div class="text-center py-12"><p class="text-gray-500">No hay citas registradas aún</p></div>
-          ))}
+          {
+            !appointments ||
+              (appointments.length === 0 && (
+                <div class="text-center py-12">
+                  <p class="text-gray-500">No hay citas registradas aún</p>
+                </div>
+              ))
+          }
         </div>
       </div>
     </div>
@@ -213,36 +370,253 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
 <script>
   import { supabase } from "../../lib/supabase";
 
-  // === PROTECCIÓN DE CLIENTE ===
+  // ==========================================
+  // 1. PROTECCIÓN DE RUTA (Cliente)
+  // ==========================================
+  // Esta función verifica si hay una sesión activa
   async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
+    // Preguntamos a Supabase: "¿Hay alguien logueado?"
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // Si NO hay sesión (nadie logueado)
     if (!session) {
-        window.location.href = '/admin/login';
+      // Redirigir al login
+      window.location.href = "/admin/login";
     } else {
-        const content = document.getElementById('main-content');
-        if (content) content.classList.remove('hidden');
+      // Si HAY sesión, mostrar el contenido
+      // (que estaba oculto con class="hidden")
+      const content = document.getElementById("main-content");
+      if (content) content.classList.remove("hidden");
     }
   }
+
+  // Ejecutar la verificación al cargar la página
   checkAuth();
 
-  // === GESTIÓN DE CITAS ===
+  // ==========================================
+  // 2. SISTEMA DE FILTROS
+  // ==========================================
+
+  // Obtenemos referencias a los elementos del DOM
+  const filterDate = document.getElementById(
+    "filter-date"
+  ) as HTMLSelectElement;
+  const filterStatus = document.getElementById(
+    "filter-status"
+  ) as HTMLSelectElement;
+  const searchInput = document.getElementById(
+    "search-input"
+  ) as HTMLInputElement;
+  const clearBtn = document.getElementById(
+    "clear-filters"
+  ) as HTMLButtonElement;
+  const exportBtn = document.getElementById(
+    "export-excel"
+  ) as HTMLButtonElement;
+
+  // Obtenemos TODAS las filas de la tabla
+  const tableRows = document.querySelectorAll("tbody tr");
+
+  // FUNCIÓN: Aplicar filtros
+  function applyFilters() {
+    const dateValue = filterDate?.value || "all";
+    const statusValue = filterStatus?.value || "all";
+    const searchValue = searchInput?.value.toLowerCase().trim() || "";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    tableRows.forEach((row) => {
+      let show = true;
+
+      // ===== FILTRO POR FECHA (COMPLETAMENTE CORREGIDO) =====
+      if (dateValue !== "all") {
+        const dateCell =
+          row.querySelector("td:first-child div:first-child")?.textContent ||
+          "";
+        const dateParts = dateCell.split("/");
+
+        if (dateParts.length === 3) {
+          const rowDate = new Date(
+            parseInt(dateParts[2]), // año
+            parseInt(dateParts[1]) - 1, // mes (0-indexed)
+            parseInt(dateParts[0]) // día
+          );
+          rowDate.setHours(0, 0, 0, 0);
+
+          // ===== FILTRO: HOY =====
+          if (dateValue === "today") {
+            if (rowDate.getTime() !== today.getTime()) {
+              show = false;
+            }
+          }
+
+          // ===== FILTRO: ESTA SEMANA (Lunes a Domingo) =====
+          if (dateValue === "week") {
+            // Calcular inicio de semana (Lunes)
+            const startOfWeek = new Date(today);
+            const dayOfWeek = startOfWeek.getDay();
+            // Si es domingo (0), retroceder 6 días; si no, ir al lunes anterior
+            const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            startOfWeek.setDate(startOfWeek.getDate() + daysToMonday);
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            // Calcular fin de semana (Domingo)
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(endOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            // Mostrar solo si está entre lunes y domingo
+            if (rowDate < startOfWeek || rowDate > endOfWeek) {
+              show = false;
+            }
+          }
+
+          // ===== FILTRO: ESTE MES (Todo el mes actual) =====
+          if (dateValue === "month") {
+            // Obtener año y mes actual
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+
+            // Obtener año y mes de la cita
+            const rowYear = rowDate.getFullYear();
+            const rowMonth = rowDate.getMonth();
+
+            // Mostrar solo si es del mismo año y mes
+            if (rowYear !== currentYear || rowMonth !== currentMonth) {
+              show = false;
+            }
+          }
+        }
+      }
+
+      // ===== FILTRO POR ESTADO =====
+      if (statusValue !== "all") {
+        const statusBadge =
+          row
+            .querySelector("td:nth-child(5) span")
+            ?.textContent?.toLowerCase() || "";
+        const statusMap: { [key: string]: string } = {
+          pending: "pendiente",
+          confirmed: "confirmada",
+          completed: "completada",
+          cancelled: "cancelada",
+        };
+
+        if (!statusBadge.includes(statusMap[statusValue])) {
+          show = false;
+        }
+      }
+
+      // ===== BÚSQUEDA POR TEXTO =====
+      if (searchValue) {
+        const rowText = row.textContent?.toLowerCase() || "";
+        if (!rowText.includes(searchValue)) {
+          show = false;
+        }
+      }
+
+      // Aplicar visibilidad
+      (row as HTMLElement).style.display = show ? "" : "none";
+    });
+  }
+
+  // Event Listeners para los filtros
+  // Cuando cambia el select de fecha → aplicar filtros
+  filterDate?.addEventListener("change", applyFilters);
+
+  // Cuando cambia el select de estado → aplicar filtros
+  filterStatus?.addEventListener("change", applyFilters);
+
+  // Cuando escribe en el input de búsqueda → aplicar filtros
+  // 'input' se dispara MIENTRAS escribe (cada tecla)
+  searchInput?.addEventListener("input", applyFilters);
+
+  // Botón LIMPIAR FILTROS
+  clearBtn?.addEventListener("click", () => {
+    // Resetear valores de los filtros
+    if (filterDate) filterDate.value = "all";
+    if (filterStatus) filterStatus.value = "all";
+    if (searchInput) searchInput.value = "";
+
+    // Mostrar TODAS las filas de nuevo
+    tableRows.forEach((row) => {
+      (row as HTMLElement).style.display = "";
+    });
+  });
+
+  // ==========================================
+  // 3. EXPORTAR A EXCEL
+  // ==========================================
+  exportBtn?.addEventListener("click", () => {
+    // Obtener solo las filas VISIBLES (no ocultas por filtros)
+    const visibleRows = Array.from(
+      document.querySelectorAll("tbody tr")
+    ).filter((row) => (row as HTMLElement).style.display !== "none");
+
+    // Convertir cada fila a formato CSV
+    const csvRows = visibleRows.map((row) => {
+      const cells = Array.from(row.querySelectorAll("td"));
+
+      // Extraer datos de las primeras 5 columnas
+      return [
+        cells[0]?.textContent?.trim().replace(/\n/g, " ") || "", // Fecha/Hora
+        cells[1]?.textContent?.trim() || "", // Cliente
+        cells[2]?.textContent?.trim().replace(/\n/g, " ") || "", // Contacto
+        cells[3]?.textContent?.trim().replace(/\n/g, " ") || "", // Servicio
+        cells[4]?.textContent?.trim() || "", // Estado
+      ].join(","); // Unir con comas
+    });
+
+    // Crear encabezados
+    const headers = "Fecha/Hora,Cliente,Contacto,Servicio,Estado";
+
+    // Unir todo (headers + datos)
+    const csv = [headers, ...csvRows].join("\n");
+
+    // Crear archivo Blob (binario)
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    // Crear URL temporal del archivo
+    const url = window.URL.createObjectURL(blob);
+
+    // Crear elemento <a> invisible para descargar
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `citas-${new Date().toISOString().split("T")[0]}.csv`; // citas-2025-12-10.csv
+
+    // Simular click para descargar
+    a.click();
+
+    // Liberar memoria
+    window.URL.revokeObjectURL(url);
+  });
+
+  // ==========================================
+  // 4. GESTIÓN DE CITAS (Confirmar/Cancelar/Completar)
+  // ==========================================
   document.addEventListener("click", async (e) => {
     const target = e.target as HTMLElement;
 
+    // Solo procesar clicks en botones con data-action
     if (target.dataset.action) {
-      const id = target.dataset.id;
-      const action = target.dataset.action;
+      const id = target.dataset.id; // UUID de la cita
+      const action = target.dataset.action; // "confirm", "cancel", "complete"
 
+      // Mensajes de confirmación
       const messages = {
         confirm: "¿Confirmar esta cita?",
         cancel: "¿Cancelar esta cita?",
         complete: "¿Marcar como completada?",
       };
 
+      // Mostrar diálogo de confirmación
       // @ts-ignore
-      if (!confirm(messages[action])) return;
+      if (!confirm(messages[action])) return; // Si cancela, salir
 
+      // Mapear acción → estado en base de datos
       const statusMap = {
         confirm: "confirmed",
         cancel: "cancelled",
@@ -252,27 +626,43 @@ const completed = appointments?.filter((a) => a.status === 'completed').length |
       // @ts-ignore
       const newStatus = statusMap[action];
 
+      // Actualizar en Supabase
       const { error } = await supabase
         .from("appointments")
-        .update({ status: newStatus }) 
-        .eq("id", id); 
+        .update({ status: newStatus }) // SET status = newStatus
+        .eq("id", id); // WHERE id = id
 
-      if (error) alert("Error: " + error.message);
-      else window.location.reload();
+      // Manejar resultado
+      if (error) {
+        alert("Error: " + error.message);
+      } else {
+        // Éxito: recargar página para ver cambios
+        window.location.reload();
+      }
     }
   });
 
-  // === CERRAR SESIÓN ===
-  const logoutBtn = document.getElementById('logout-btn');
+  // ==========================================
+  // 5. CERRAR SESIÓN
+  // ==========================================
+  const logoutBtn = document.getElementById("logout-btn");
+
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-        if(confirm('¿Seguro que quieres cerrar sesión?')) {
-            await supabase.auth.signOut();
-            // Borramos cookies para que el servidor también sepa que salimos
-            document.cookie = "sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            document.cookie = "sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            window.location.href = '/admin/login';
-        }
+    logoutBtn.addEventListener("click", async () => {
+      // Confirmar que quiere salir
+      if (confirm("¿Seguro que quieres cerrar sesión?")) {
+        // Cerrar sesión en Supabase
+        await supabase.auth.signOut();
+
+        // Borrar cookies (para que el servidor también sepa)
+        document.cookie =
+          "sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie =
+          "sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+        // Redirigir al login
+        window.location.href = "/admin/login";
+      }
     });
   }
 </script>
