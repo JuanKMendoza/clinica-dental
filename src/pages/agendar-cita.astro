@@ -1,6 +1,15 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { supabase } from "../../src/lib/supabase.js";
+// Ruta corregida
+import { supabase } from "../lib/supabase";
+
+// 1. OBTENER SERVICIOS REALES DESDE EL SERVIDOR (SSR)
+// Esto llena el select automáticamente con lo que tengas en la base de datos
+const { data: services } = await supabase
+  .from("services")
+  .select("id, name, price")
+  .eq("is_active", true)
+  .order("name");
 ---
 
 <Layout
@@ -163,7 +172,7 @@ import { supabase } from "../../src/lib/supabase.js";
               2. Información de la Cita
             </h2>
 
-            <!-- Servicio -->
+            <!-- Servicio (DINÁMICO DESDE BASE DE DATOS) -->
             <div>
               <label
                 for="service"
@@ -178,17 +187,12 @@ import { supabase } from "../../src/lib/supabase.js";
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="">Selecciona un servicio</option>
-                <option value="limpieza">Limpieza Dental</option>
-                <option value="blanqueamiento">Blanqueamiento</option>
-                <option value="ortodoncia">Ortodoncia / Brackets</option>
-                <option value="implantes">Implantes Dentales</option>
-                <option value="resinas">Resinas / Calzas</option>
-                <option value="endodoncia">Endodoncia / Conductos</option>
-                <option value="protesis">Prótesis Dentales</option>
-                <option value="cirugia">Cirugía / Extracción</option>
-                <option value="urgencia">Urgencia / Dolor</option>
-                <option value="consulta">Consulta General</option>
-                <option value="otro">Otro</option>
+                <!-- Aquí inyectamos los servicios reales de Supabase -->
+                {services && services.map((service) => (
+                    <option value={service.id}>
+                        {service.name}
+                    </option>
+                ))}
               </select>
             </div>
 
@@ -444,7 +448,6 @@ import { supabase } from "../../src/lib/supabase.js";
       submitButton.innerHTML = '<span>Guardando tu cita...</span>';
       
       try {
-        // Obtener datos del formulario
         const formData = new FormData(form);
         
         // Obtener el ID del negocio (tu clínica)
@@ -457,18 +460,14 @@ import { supabase } from "../../src/lib/supabase.js";
           throw new Error('No se pudo obtener información del negocio');
         }
 
-        // Obtener el servicio seleccionado
-        const serviceName = formData.get('service') as string;
-        const { data: service } = await supabase
-          .from('services')
-          .select('id')
-          .ilike('name', `%${serviceName}%`)
-          .single();
+        // === CAMBIO AQUÍ: Ahora 'service' trae el ID, no el nombre ===
+        // Ya no necesitamos buscar en la BD, lo usamos directo
+        const serviceId = formData.get('service');
 
         // Preparar datos de la cita
         const appointmentData = {
           business_id: business.id,
-          service_id: service?.id || null,
+          service_id: serviceId, // Usamos el ID directo
           customer_name: formData.get('name'),
           customer_email: formData.get('email'),
           customer_phone: formData.get('phone'),
@@ -492,7 +491,7 @@ Cómo nos conoció: ${formData.get('source') || 'No especificado'}
 
         if (error) throw error;
 
-        // ÉXITO
+        // ÉXITO (Misma animación y mensaje bonito de antes)
         formMessage.className = 'block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6';
         formMessage.innerHTML = `
           <svg class="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
