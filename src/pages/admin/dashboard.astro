@@ -2,52 +2,39 @@
 import Layout from "../../layouts/Layout.astro";
 import { supabase } from "../../lib/supabase";
 
-// === 1. AUTENTICACIÓN SERVIDOR ===
+// 1. AUTH
 const accessToken = Astro.cookies.get("sb-access-token")?.value;
 const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
 
 if (accessToken && refreshToken) {
-  await supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
+  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
 }
 
-// === 2. OBTENER DATOS ===
+// 2. DATOS
 const { data: appointments } = await supabase
   .from("appointments")
-  .select(`*, services (name, duration, price)`)
+  .select(`*, services (name, duration, price), dentists (name)`)
   .order("appointment_date", { ascending: true })
   .order("appointment_time", { ascending: true });
 
-// Servicios (Para el formulario de Nueva Cita)
-const { data: servicesList } = await supabase
-  .from("services")
-  .select("id, name, business_id")
-  .eq("is_active", true)
-  .order("name");
-
+const { data: servicesList } = await supabase.from("services").select("id, name, business_id").eq("is_active", true).order("name");
+const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("is_active", true).order("name");
 const defaultBusinessId = servicesList?.[0]?.business_id || "";
 
-// Contadores
 const pending = appointments?.filter((a) => a.status === "pending").length || 0;
 const confirmed = appointments?.filter((a) => a.status === "confirmed").length || 0;
 const cancelled = appointments?.filter((a) => a.status === "cancelled").length || 0;
 const completed = appointments?.filter((a) => a.status === "completed").length || 0;
 
-// Helper para iniciales
-const getInitials = (name: string) => {
-  return name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
-};
+const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
 ---
-
-<Layout title="Admin Panel - Gestión de Citas">
-  
-  <div id="app-data" data-services={JSON.stringify(servicesList)} data-business-id={defaultBusinessId}></div>
+<!-- dashboard.astro -->
+<Layout title="Admin Panel">
+  <div id="app-data" data-services={JSON.stringify(servicesList)} data-dentists={JSON.stringify(dentistsList)} data-business-id={defaultBusinessId}></div>
 
   <div id="main-content" class="min-h-screen bg-gray-50/50 py-8 hidden relative">
     
-    <!-- === MODAL DE CONFIRMACIÓN === -->
+    <!-- MODAL -->
     <div id="confirmation-modal" class="fixed inset-0 z-[9999] hidden" role="dialog" aria-modal="true">
         <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop"></div>
         <div class="fixed inset-0 z-10 overflow-y-auto">
@@ -55,14 +42,10 @@ const getInitials = (name: string) => {
             <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:w-full sm:max-w-md scale-95 opacity-0" id="modal-panel">
               <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div class="sm:flex sm:items-start">
-                  <div id="modal-icon-bg" class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg id="modal-icon" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"></svg>
-                  </div>
+                  <div id="modal-icon-bg" class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10"><svg id="modal-icon" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"></svg></div>
                   <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                    <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">Confirmar acción</h3>
-                    <div class="mt-2">
-                      <p class="text-sm text-gray-500" id="modal-message">¿Estás seguro?</p>
-                    </div>
+                    <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">Confirmar</h3>
+                    <div class="mt-2"><p class="text-sm text-gray-500" id="modal-message">¿Seguro?</p></div>
                   </div>
                 </div>
               </div>
@@ -76,28 +59,21 @@ const getInitials = (name: string) => {
     </div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- HEADER -->
+      <!-- HEADER & KPIs -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
         <div class="flex items-center gap-4 w-full md:w-auto">
-            <div class="bg-blue-600 p-3 rounded-xl text-white shadow-blue-200 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
-            </div>
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Agenda Médica</h1>
-                <p class="text-sm text-gray-500">Administración de pacientes</p>
-            </div>
+            <div class="bg-blue-600 p-3 rounded-xl text-white shadow-blue-200 shadow-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg></div>
+            <div><h1 class="text-2xl font-bold text-gray-900 tracking-tight">Agenda Médica</h1><p class="text-sm text-gray-500">Administración</p></div>
         </div>
         <div class="flex flex-wrap gap-3 w-full md:w-auto">
           <button id="new-appointment-btn" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
-            Nueva Cita
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg> Nueva Cita
           </button>
-          <a href="/" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-center">Ver Sitio</a>
+          <a href="/" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-center">Ver Sitio</a>
           <button id="logout-btn" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200 flex items-center justify-center gap-2">Salir</button>
         </div>
       </div>
 
-      <!-- KPI CARDS -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 hover:border-blue-200 transition-colors">
             <div class="flex justify-between"><span class="text-sm font-semibold text-gray-400 uppercase">Total</span><span class="p-1.5 bg-gray-50 rounded-lg text-gray-600">📊</span></div>
@@ -117,14 +93,46 @@ const getInitials = (name: string) => {
         </div>
       </div>
 
-      <!-- BARRA DE HERRAMIENTAS -->
+      <!-- FILTROS (ACTUALIZADO) -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <!-- Filtros -->
-            <div class="md:col-span-3"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label><select id="filter-date" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50"><option value="all">📅 Todo el historial</option><option value="today">📆 Hoy</option><option value="week">📅 Esta semana</option><option value="month">📅 Este mes</option></select></div>
-            <div class="md:col-span-3"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label><select id="filter-status" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50"><option value="all">🔄 Todos</option><option value="pending">⏳ Pendientes</option><option value="confirmed">👍 Confirmadas</option><option value="completed">✅ Completadas</option><option value="cancelled">🚫 Canceladas</option></select></div>
-            <div class="md:col-span-4"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar</label><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div><input type="text" id="search-input" autocomplete="off" class="pl-10 w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50" placeholder="Nombre, teléfono o email..."></div></div>
-            <div class="md:col-span-2 flex gap-2 justify-end"><button id="clear-filters" class="text-sm text-gray-500 hover:text-blue-600 px-3 py-2 transition-colors">Limpiar</button><button id="export-excel" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 shadow-sm flex items-center gap-1.5 transition-all hover:scale-105">Excel</button></div>
+            <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label>
+                <select id="filter-date" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                    <option value="all">📅 Todo el historial</option>
+                    <option value="today">📆 Hoy</option>
+                    <option value="week">📅 Esta semana</option>
+                    <option value="month">📅 Este mes</option>
+                </select>
+            </div>
+            <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label>
+                <select id="filter-status" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                    <option value="all">🔄 Todos</option>
+                    <option value="pending">⏳ Pendientes</option>
+                    <option value="confirmed">👍 Confirmadas</option>
+                    <option value="completed">✅ Completadas</option>
+                    <option value="cancelled">🚫 Canceladas</option>
+                </select>
+            </div>
+            <!-- FILTRO DENTISTA ACTUALIZADO -->
+            <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Profesional</label>
+                <select id="filter-dentist" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
+                    <option value="all">👨‍⚕️ Todos</option>
+                    <option value="unassigned">⚠️ Sin Asignar</option> <!-- NUEVA OPCIÓN -->
+                    {dentistsList && dentistsList.map(d => <option value={d.id}>{d.name}</option>)}
+                </select>
+            </div>
+            
+            <div class="md:col-span-3">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar</label>
+                <input type="text" id="search-input" autocomplete="off" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50" placeholder="Paciente o teléfono...">
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button id="clear-filters" class="text-sm text-gray-500 hover:text-blue-600 px-3 py-2">Limpiar</button>
+            <button id="export-excel" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 shadow-sm flex items-center gap-1.5 transition-all hover:scale-105">Excel</button>
         </div>
       </div>
 
@@ -134,8 +142,9 @@ const getInitials = (name: string) => {
           <table class="w-full">
             <thead>
               <tr class="bg-gray-50/50 border-b border-gray-100">
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha & Hora</th>
+                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
                 <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Paciente</th>
+                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Profesional</th>
                 <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
                 <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Servicio</th>
                 <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
@@ -150,32 +159,44 @@ const getInitials = (name: string) => {
                     const dayNum = dateObj.toLocaleDateString('es-CO', { day: 'numeric' });
                     const monthName = dateObj.toLocaleDateString('es-CO', { month: 'short' });
                     
-                    // === SOLUCIÓN: NORMALIZAR NOTAS PARA HTML ===
-                    // Reemplazamos los enters (\n) por tuberías (|) para que el HTML no se rompa
-                    const normalizedNotes = (apt.notes || "").replace(/[\r\n]+/g, " | ");
-
                     return (
                     <tr 
                         class="hover:bg-blue-50/30 transition-colors group search-item"
                         style="display: table-row;"
                         data-status={apt.status}
                         data-date={apt.appointment_date}
+                        data-dentist-id={apt.dentist_id || "null"} 
                         data-search={`${apt.customer_name} ${apt.customer_phone} ${apt.customer_email}`}
+                        
                         data-name={apt.customer_name}
                         data-phone={apt.customer_phone}
                         data-email={apt.customer_email || ''}
                         data-service={apt.services?.name || 'N/A'}
                         data-time={apt.appointment_time}
-                        data-notes={normalizedNotes} 
+                        data-age={apt.patient_age}
+                        data-doc={apt.patient_doc}
+                        data-reason={apt.consultation_reason}
+                        data-source={apt.marketing_source}
+                        data-first={apt.is_first_visit ? 'Sí' : 'No'}
+                        data-dentist-name={apt.dentists?.name || "No asignado"}
                     >
                       <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="flex flex-col items-center justify-center w-12 h-12 bg-gray-100 rounded-lg border border-gray-200"><span class="text-[10px] uppercase font-bold text-gray-500 leading-none">{monthName}</span><span class="text-lg font-bold text-gray-900 leading-none mt-0.5">{dayNum}</span></div><div class="flex flex-col"><span class="text-sm font-medium text-gray-900 capitalize">{dayName}</span><span class="text-sm text-gray-500 font-mono bg-gray-100 px-1.5 rounded text-center">{apt.appointment_time.slice(0, 5)}</span></div></div></td>
                       <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">{getInitials(apt.customer_name)}</div><div class="text-sm font-semibold text-gray-900">{apt.customer_name}</div></div></td>
+                      
+                      <!-- DENTISTA -->
+                      <td class="px-6 py-4">
+                        {apt.dentists?.name ? (
+                            <div class="flex items-center gap-2"><span class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs">👨‍⚕️</span><span class="text-sm text-gray-700 font-medium">{apt.dentists.name}</span></div>
+                        ) : (
+                            <span class="text-xs text-gray-400 italic">No asignado</span>
+                        )}
+                      </td>
+
                       <td class="px-6 py-4"><div class="flex flex-col items-start gap-2"><a href={`https://wa.me/57${apt.customer_phone.replace(/\D/g,'')}`} target="_blank" class="group flex items-center gap-2 px-3 py-1.5 bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white rounded-full transition-all duration-300 border border-[#25D366]/20 shadow-sm"><svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg><span class="text-xs font-bold font-mono tracking-wide">{apt.customer_phone}</span></a>{apt.customer_email && (<div class="flex items-center gap-1.5 text-xs text-gray-400 pl-1 group-hover:text-gray-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg><span class="truncate max-w-[140px]" title={apt.customer_email}>{apt.customer_email}</span></div>)}</div></td>
                       <td class="px-6 py-4"><div class="text-sm text-gray-900 font-medium">{apt.services?.name || "General"}</div><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 mt-1">⏱ {apt.services?.duration || 30} min</span></td>
                       <td class="px-6 py-4 whitespace-nowrap">{apt.status === "pending" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">⏳ Pendiente</span>}{apt.status === "confirmed" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">👍 Confirmada</span>}{apt.status === "completed" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">✅ Completada</span>}{apt.status === "cancelled" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">🚫 Cancelada</span>}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-right"><div class="flex justify-end items-center gap-2">
-                        <!-- BOTÓN VER FICHA -->
-                        <button title="Ver Ficha" data-id={apt.id} data-action="view_details" data-name={apt.customer_name} data-notes={normalizedNotes} class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-600 transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" /><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg></button>
+                        <button title="Ver Ficha" data-id={apt.id} data-action="view_details" data-name={apt.customer_name} data-age={apt.patient_age} data-doc={apt.patient_doc} data-reason={apt.consultation_reason} data-source={apt.marketing_source} data-dentist={apt.dentists?.name || "No asignado"} class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-600 transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" /><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg></button>
                         {apt.status !== 'cancelled' && apt.status !== 'completed' && (<button title="Editar" data-id={apt.id} data-action="edit" data-date={apt.appointment_date} data-time={apt.appointment_time} class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg></button>)}
                         {apt.status === "pending" && (<><button title="Confirmar" data-id={apt.id} data-action="confirm" class="group h-8 px-3 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 pointer-events-none"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg></button><button title="Cancelar" data-id={apt.id} data-action="cancel" class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 pointer-events-none"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg></button></>)}
                         {apt.status === "confirmed" && (<><button title="Completar" data-id={apt.id} data-action="complete" class="group h-8 px-3 bg-blue-600 text-white border border-blue-700 rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 pointer-events-none"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg></button><button title="Cancelar" data-id={apt.id} data-action="cancel" class="group h-8 w-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 pointer-events-none"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" /></svg></button></>)}
@@ -211,82 +232,48 @@ const getInitials = (name: string) => {
   }
   checkAuth();
 
-  // 2. RECUPERAR DATOS DE SERVICIOS
+  // 2. RECUPERAR DATOS DE SERVICIOS Y DENTISTAS
   const appData = document.getElementById('app-data');
   const servicesList = appData ? JSON.parse(appData.dataset.services || '[]') : [];
+  const dentistsList = appData ? JSON.parse(appData.dataset.dentists || '[]') : [];
   const defaultBusinessId = appData?.dataset.businessId || "";
 
-  // 3. NUEVA CITA (SWEETALERT2 MODERNO Y COMPLETO)
+  // 3. NUEVA CITA
   document.getElementById('new-appointment-btn')?.addEventListener('click', async () => {
-    const serviceOptions = servicesList.map((s: any) => 
-        `<option value="${s.id}">${s.name}</option>`
-    ).join('');
+    
+    const serviceOptions = servicesList.map((s: any) => `<option value="${s.id}">${s.name}</option>`).join('');
+    const dentistOptions = dentistsList.map((d: any) => `<option value="${d.id}">${d.name}</option>`).join('');
 
     const { value: formValues } = await Swal.fire({
         title: '<h2 class="text-2xl font-bold text-gray-800">Nueva Cita</h2>',
         html: `
             <div class="flex flex-col gap-4 text-left p-2">
                 <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Paciente</label>
-                        <input id="new-name" autocomplete="off" placeholder="Nombre completo" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label>
-                        <input id="new-phone" autocomplete="off" placeholder="Ej: 3001234567" type="tel" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Paciente</label><input id="new-name" autocomplete="off" placeholder="Nombre completo" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label><input id="new-phone" autocomplete="off" placeholder="Ej: 3001234567" type="tel" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email (Opcional)</label>
-                        <input id="new-email" autocomplete="off" placeholder="correo@ejemplo.com" type="email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Documento (Opcional)</label>
-                        <input id="new-document" autocomplete="off" placeholder="C.C. / DNI" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email (Opcional)</label><input id="new-email" autocomplete="off" placeholder="correo@ejemplo.com" type="email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
+                     <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Documento (Opcional)</label><input id="new-document" autocomplete="off" placeholder="C.C. / DNI" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
                 </div>
 
                  <div class="grid grid-cols-3 gap-3">
-                    <div class="col-span-1">
-                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Edad</label>
-                        <input id="new-age" autocomplete="off" type="number" placeholder="Ej: 25" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div class="col-span-2">
-                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fuente</label>
-                        <select id="new-source" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white">
-                            <option value="presencial">Presencial / Walk-in</option>
-                            <option value="telefono">Llamada Telefónica</option>
-                            <option value="google">Google</option>
-                            <option value="referido">Referido</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Servicio</label>
-                    <select id="new-service" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white">
-                        <option value="">Selecciona un servicio...</option>
-                        ${serviceOptions}
-                    </select>
+                    <div class="col-span-1"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Edad</label><input id="new-age" autocomplete="off" type="number" placeholder="Ej: 25" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
+                    <div class="col-span-2"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fuente</label><select id="new-source" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="presencial">Presencial / Walk-in</option><option value="telefono">Llamada Telefónica</option><option value="google">Google</option><option value="referido">Referido</option></select></div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label>
-                        <input id="new-date" type="date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label>
-                        <input id="new-time" type="time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Servicio</label><select id="new-service" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="">Selecciona servicio...</option>${serviceOptions}</select></div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dentista</label><select id="new-dentist" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="">Cualquiera disponible</option>${dentistOptions}</select></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label><input id="new-date" type="date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
+                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label><input id="new-time" type="time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
                 </div>
                 
-                <div>
-                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Motivo / Notas</label>
-                    <textarea id="new-reason" rows="2" placeholder="Motivo de la consulta..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></textarea>
-                </div>
+                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Motivo / Notas</label><textarea id="new-reason" rows="2" placeholder="Motivo de la consulta..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></textarea></div>
             </div>
         `,
         width: '600px',
@@ -296,11 +283,7 @@ const getInitials = (name: string) => {
         confirmButtonColor: '#2563EB',
         cancelButtonColor: '#6B7280',
         cancelButtonText: 'Cancelar',
-        customClass: {
-            popup: 'rounded-2xl',
-            confirmButton: 'rounded-lg px-6 py-2.5 font-bold',
-            cancelButton: 'rounded-lg px-6 py-2.5 font-bold'
-        },
+        customClass: { popup: 'rounded-2xl', confirmButton: 'rounded-lg px-6 py-2.5 font-bold', cancelButton: 'rounded-lg px-6 py-2.5 font-bold' },
         preConfirm: () => {
             const name = (document.getElementById('new-name') as HTMLInputElement).value;
             const phone = (document.getElementById('new-phone') as HTMLInputElement).value;
@@ -311,47 +294,40 @@ const getInitials = (name: string) => {
             const date = (document.getElementById('new-date') as HTMLInputElement).value;
             const time = (document.getElementById('new-time') as HTMLInputElement).value;
             const service = (document.getElementById('new-service') as HTMLSelectElement).value;
+            const dentist = (document.getElementById('new-dentist') as HTMLSelectElement).value;
             const reason = (document.getElementById('new-reason') as HTMLTextAreaElement).value;
 
             if (!name || !phone || !date || !time || !service) {
                 Swal.showValidationMessage('Por favor completa los campos obligatorios (*)');
                 return false;
             }
-            return { name, phone, email, documentId, age, source, date, time, service, reason };
+            return { name, phone, email, documentId, age, source, date, time, service, dentist, reason };
         }
     });
 
     if (formValues) {
-        Swal.fire({ 
-            title: 'Guardando...', 
-            text: 'Registrando nueva cita en el sistema',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading() 
-        });
-
-        const notesString = `Edad: ${formValues.age || 'No especificado'} | CC: ${formValues.documentId || 'No especificado'} | 1ra Vez: No | Motivo: ${formValues.reason || 'Agendado por Admin'} | Cómo nos conoció: ${formValues.source}`;
+        Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
 
         const { error } = await supabase.from('appointments').insert({
             business_id: defaultBusinessId,
             service_id: formValues.service,
+            dentist_id: formValues.dentist || null,
             customer_name: formValues.name,
             customer_email: formValues.email,
             customer_phone: formValues.phone,
             appointment_date: formValues.date,
             appointment_time: formValues.time,
             status: 'confirmed',
-            notes: notesString
+            patient_age: formValues.age ? parseInt(formValues.age) : null,
+            patient_doc: formValues.documentId,
+            consultation_reason: formValues.reason,
+            marketing_source: formValues.source,
+            is_first_visit: false
         });
 
-        if (error) {
-            Swal.fire('Error', error.message, 'error');
-        } else {
-            await Swal.fire({ 
-                icon: 'success', 
-                title: '¡Cita Creada!', 
-                timer: 2000, 
-                showConfirmButton: false 
-            });
+        if (error) Swal.fire('Error', error.message, 'error');
+        else {
+            await Swal.fire({ icon: 'success', title: '¡Cita Creada!', timer: 2000, showConfirmButton: false });
             window.location.reload();
         }
     }
@@ -360,6 +336,7 @@ const getInitials = (name: string) => {
   // 4. FILTROS Y BÚSQUEDA
   const filterDate = document.getElementById("filter-date") as HTMLSelectElement;
   const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
+  const filterDentist = document.getElementById("filter-dentist") as HTMLSelectElement;
   const searchInput = document.getElementById("search-input") as HTMLInputElement;
   const clearBtn = document.getElementById("clear-filters");
   const exportBtn = document.getElementById("export-excel");
@@ -368,6 +345,7 @@ const getInitials = (name: string) => {
   function applyFilters() {
     const dateVal = filterDate?.value || "all";
     const statusVal = filterStatus?.value || "all";
+    const dentistVal = filterDentist?.value || "all";
     const searchVal = searchInput?.value.toLowerCase().trim() || "";
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -378,8 +356,19 @@ const getInitials = (name: string) => {
 
       // Filtro Estado
       if (statusVal !== "all") {
-        const rowStatus = rowEl.dataset.status || "";
-        if (rowStatus !== statusVal) show = false;
+        if (rowEl.dataset.status !== statusVal) show = false;
+      }
+
+      // === FILTRO DENTISTA CORREGIDO ===
+      if (dentistVal !== "all") {
+        const rowDentistId = rowEl.dataset.dentistId;
+        if (dentistVal === "unassigned") {
+            // Mostrar solo si es "null"
+            if (rowDentistId !== "null") show = false;
+        } else {
+            // Mostrar solo si coincide el ID exacto
+            if (rowDentistId !== dentistVal) show = false;
+        }
       }
 
       // Filtro Fecha
@@ -406,22 +395,29 @@ const getInitials = (name: string) => {
         if (!searchText.includes(searchVal)) show = false;
       }
 
-      rowEl.style.display = show ? "table-row" : "none";
+      // Mostrar/Ocultar
+      if(window.innerWidth >= 768) {
+         rowEl.style.display = show ? "table-row" : "none";
+      } else {
+         rowEl.style.display = show ? "flex" : "none";
+      }
     });
   }
 
   filterDate?.addEventListener("change", applyFilters);
   filterStatus?.addEventListener("change", applyFilters);
+  filterDentist?.addEventListener("change", applyFilters);
   searchInput?.addEventListener("input", applyFilters);
   
   clearBtn?.addEventListener("click", () => {
     filterDate.value = "all";
     filterStatus.value = "all";
+    filterDentist.value = "all";
     searchInput.value = "";
     applyFilters();
   });
 
-  // 5. EXPORTAR EXCEL (VERSIÓN BLINDADA REGEX)
+  // 5. EXPORTAR EXCEL
   exportBtn?.addEventListener("click", () => {
     const visibleRows = Array.from(document.querySelectorAll('tbody tr'))
         .filter(row => (row as HTMLElement).style.display !== 'none');
@@ -433,75 +429,65 @@ const getInitials = (name: string) => {
         'cancelled': 'Cancelada'
     };
 
-    let csv = "Fecha;Hora;Paciente;Documento;Edad;Telefono;Email;Servicio;Estado;Origen;Motivo\n";
+    let csv = "Fecha;Hora;Paciente;Documento;Edad;Telefono;Email;Servicio;Dentista;Estado;Origen;Motivo\n";
     
     visibleRows.forEach(row => {
         const el = row as HTMLElement;
-        
-        const date = el.dataset.date || "";
-        const time = el.dataset.time || "";
-        const name = (el.dataset.name || "").replace(/"/g, '""'); 
-        const phone = el.dataset.phone || "";
-        const email = el.dataset.email || "No registrado";
-        const service = el.dataset.service || "";
-        const statusRaw = el.dataset.status || "";
+        const ds = el.dataset;
+
+        const date = ds.date || "";
+        const time = ds.time || "";
+        const name = (ds.name || "").replace(/"/g, '""'); 
+        const phone = ds.phone || "";
+        const email = ds.email || "No registrado";
+        const service = ds.service || "";
+        const dentist = ds.dentistName || "No asignado";
+        const statusRaw = ds.status || "";
         const status = statusTranslate[statusRaw] || statusRaw;
+        const age = ds.age || "";
+        const doc = (ds.doc || "").replace(/"/g, '');
+        const source = (ds.source || "").replace(/"/g, '');
+        const reason = (ds.reason || "").replace(/"/g, '');
 
-        // === EXTRACCIÓN CON REGEX (MÁS POTENTE) ===
-        const rawNotes = el.dataset.notes || "";
-        
-        // Esta función busca "Palabra: Valor" sin importar saltos de línea raros
-        const extract = (key: string) => {
-            const regex = new RegExp(`${key}[:\\s]+([^|\\n]+)`, 'i');
-            const match = rawNotes.match(regex);
-            return match ? match[1].trim() : "";
-        };
-
-        const edad = extract("Edad");
-        const documento = extract("Documento") || extract("CC");
-        const origen = extract("Cómo nos conoció") || extract("Fuente");
-        const motivo = extract("Motivo");
-
-        csv += `${date};${time};"${name}";"${documento}";"${edad}";${phone};${email};"${service}";${status};"${origen}";"${motivo}"\n`;
+        csv += `${date};${time};"${name}";"${doc}";"${age}";${phone};${email};"${service}";"${dentist}";"${status}";"${source}";"${reason}"\n`;
     });
 
     const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `reporte_completo_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `reporte_citas_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   });
 
-  // 6. ACCIONES Y EDICIÓN (SWEETALERT2)
+  // 6. ACCIONES Y EDICIÓN
   document.addEventListener("click", async (e) => {
     // @ts-ignore
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
 
     const { id, action } = btn.dataset;
+    const ds = btn.dataset;
 
-    // === VER FICHA ===
     if (action === 'view_details') {
-        const notes = btn.dataset.notes || "Sin información adicional.";
-        const name = btn.dataset.name || "Paciente";
-        // Convertimos los | en saltos de línea para que se vea bonito en el modal
-        const formattedNotes = notes.replace(/\|/g, '<br>').replace(/\n/g, '<br>');
-
-        Swal.fire({
-            title: `📋 Ficha de ${name}`,
-            html: `<div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 leading-relaxed">${formattedNotes}</div>`,
-            confirmButtonText: 'Cerrar',
-            confirmButtonColor: '#3B82F6'
-        });
+        const name = ds.name || "Paciente";
+        const htmlContent = `
+            <div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
+                <p><strong>Edad:</strong> ${ds.age || 'N/A'} años</p>
+                <p><strong>Documento:</strong> ${ds.doc || 'N/A'}</p>
+                <p><strong>Atendido por:</strong> ${ds.dentist || 'No asignado'}</p>
+                <p><strong>Motivo:</strong> ${ds.reason || 'Sin especificar'}</p>
+                <p><strong>Origen:</strong> ${ds.source || 'Desconocido'}</p>
+            </div>
+        `;
+        Swal.fire({ title: `📋 Ficha de ${name}`, html: htmlContent, confirmButtonText: 'Cerrar', confirmButtonColor: '#3B82F6' });
         return; 
     }
 
-    // === EDICIÓN ===
     if (action === 'edit') {
-        const currentDate = btn.dataset.date;
-        const currentTime = btn.dataset.time;
+        const currentDate = ds.date;
+        const currentTime = ds.time;
 
         const { value: formValues } = await Swal.fire({
             title: 'Reprogramar Cita',
@@ -520,7 +506,7 @@ const getInitials = (name: string) => {
             showCancelButton: true,
             confirmButtonColor: '#4F46E5',
             cancelButtonColor: '#6B7280',
-            confirmButtonText: 'Guardar Cambios',
+            confirmButtonText: 'Guardar',
             cancelButtonText: 'Cancelar',
             preConfirm: () => {
                 return [
@@ -532,76 +518,24 @@ const getInitials = (name: string) => {
 
         if (formValues) {
             const [newDate, newTime] = formValues;
-            
             if (!newDate || !newTime) return;
-
-            Swal.fire({
-                title: 'Actualizando...',
-                timerProgressBar: true,
-                didOpen: () => Swal.showLoading()
-            });
-
-            const { error } = await supabase
-                .from("appointments")
-                .update({ appointment_date: newDate, appointment_time: newTime })
-                .eq("id", id);
-
-            if (error) {
-                Swal.fire('Error', error.message, 'error');
-            } else {
-                await Swal.fire({
-                    title: '¡Cita Reprogramada!',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-                window.location.reload();
-            }
+            Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
+            const { error } = await supabase.from("appointments").update({ appointment_date: newDate, appointment_time: newTime }).eq("id", id);
+            if (error) Swal.fire('Error', error.message, 'error');
+            else { await Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
         }
         return; 
     }
 
-    // === ESTADOS ===
     const configs: any = {
-        confirm: { 
-            title: '¿Confirmar Cita?',
-            text: "El paciente será notificado.",
-            icon: 'question',
-            confirmBtnText: 'Sí, confirmar',
-            confirmBtnColor: '#10B981'
-        },
-        cancel: { 
-            title: '¿Cancelar Cita?',
-            text: "Podrás restaurarla después.",
-            icon: 'warning',
-            confirmBtnText: 'Sí, cancelar',
-            confirmBtnColor: '#EF4444'
-        },
-        complete: { 
-            title: '¿Finalizar Servicio?',
-            text: "Se marcará como completado.",
-            icon: 'success',
-            confirmBtnText: 'Sí, finalizar',
-            confirmBtnColor: '#3B82F6'
-        },
-        restore: { 
-            title: '¿Restaurar Cita?',
-            text: "Volverá al estado Pendiente.",
-            icon: 'info',
-            confirmBtnText: 'Restaurar',
-            confirmBtnColor: '#10B981'
-        },
-        undo_complete: { 
-            title: '¿Deshacer?',
-            text: "Volverá al estado Confirmada.",
-            icon: 'question',
-            confirmBtnText: 'Sí, deshacer',
-            confirmBtnColor: '#F59E0B'
-        }
+        confirm: { title: '¿Confirmar Cita?', text: "El paciente será notificado.", icon: 'question', confirmBtnText: 'Sí, confirmar', confirmBtnColor: '#10B981' },
+        cancel: { title: '¿Cancelar Cita?', text: "Podrás restaurarla después.", icon: 'warning', confirmBtnText: 'Sí, cancelar', confirmBtnColor: '#EF4444' },
+        complete: { title: '¿Finalizar Servicio?', text: "Se marcará como completado.", icon: 'success', confirmBtnText: 'Sí, finalizar', confirmBtnColor: '#3B82F6' },
+        restore: { title: '¿Restaurar Cita?', text: "Volverá al estado Pendiente.", icon: 'info', confirmBtnText: 'Restaurar', confirmBtnColor: '#10B981' },
+        undo_complete: { title: '¿Deshacer?', text: "Volverá al estado Confirmada.", icon: 'question', confirmBtnText: 'Sí, deshacer', confirmBtnColor: '#F59E0B' }
     };
 
     const config = configs[action];
-
     const result = await Swal.fire({
         title: config.title,
         text: config.text,
@@ -610,54 +544,20 @@ const getInitials = (name: string) => {
         confirmButtonColor: config.confirmBtnColor,
         cancelButtonColor: '#6B7280',
         confirmButtonText: config.confirmBtnText,
-        cancelButtonText: 'Cancelar',
-        reverseButtons: true,
-        customClass: {
-            popup: 'rounded-2xl',
-            confirmButton: 'rounded-lg px-4 py-2',
-            cancelButton: 'rounded-lg px-4 py-2'
-        }
+        cancelButtonText: 'Cancelar'
     });
 
     if (result.isConfirmed) {
-        const statusMap: any = {
-            confirm: "confirmed",
-            cancel: "cancelled",
-            complete: "completed",
-            restore: "pending",
-            undo_complete: "confirmed"
-        };
-
+        const statusMap: any = { confirm: "confirmed", cancel: "cancelled", complete: "completed", restore: "pending", undo_complete: "confirmed" };
         const newStatus = statusMap[action];
-
-        Swal.fire({
-            title: 'Procesando...',
-            timerProgressBar: true,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        const { error } = await supabase
-            .from("appointments")
-            .update({ status: newStatus })
-            .eq("id", id);
-
-        if (error) {
-            Swal.fire('Error', error.message, 'error');
-        } else {
-            await Swal.fire({
-                title: '¡Listo!',
-                icon: 'success',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            window.location.reload();
-        }
+        Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
+        const { error } = await supabase.from("appointments").update({ status: newStatus }).eq("id", id);
+        if (error) Swal.fire('Error', error.message, 'error');
+        else { await Swal.fire({ icon: 'success', title: '¡Listo!', timer: 1000, showConfirmButton: false }); window.location.reload(); }
     }
   });
 
-  // 7. LOGOUT (SweetAlert2)
+  // 7. LOGOUT
   document.getElementById("logout-btn")?.addEventListener("click", async () => {
     const result = await Swal.fire({
         title: '¿Cerrar sesión?',

@@ -1,21 +1,59 @@
 ---
 import Layout from "../layouts/Layout.astro";
-// Ruta corregida
 import { supabase } from "../lib/supabase";
 
-// 1. OBTENER SERVICIOS REALES DESDE EL SERVIDOR (SSR)
-// Esto llena el select automáticamente con lo que tengas en la base de datos
+// 1. OBTENER DATOS Y RELACIONES (SSR)
+// Servicios
 const { data: services } = await supabase
   .from("services")
   .select("id, name, price")
   .eq("is_active", true)
   .order("name");
+
+// Dentistas CON sus servicios relacionados
+const { data: dentistRelations } = await supabase
+  .from("dentists")
+  .select(`
+    id, 
+    name,
+    dentist_services(service_id)
+  `)
+  .eq("is_active", true)
+  .order("name");
+
+// --- LÓGICA DE MAPEO (Cerebro del filtro) ---
+// Creamos un mapa: { "ID_SERVICIO": ["ID_DENTISTA_1", "ID_DENTISTA_2"] }
+const serviceToDentists: Record<string, string[]> = {};
+
+// Inicializamos arrays vacíos para cada servicio
+services?.forEach(s => serviceToDentists[s.id] = []);
+
+// Llenamos el mapa con los dentistas capaces
+dentistRelations?.forEach(dentist => {
+    // @ts-ignore
+    dentist.dentist_services.forEach((ds: any) => {
+        if (serviceToDentists[ds.service_id]) {
+            serviceToDentists[ds.service_id].push(dentist.id);
+        }
+    });
+});
+
+// Mapa de Nombres: { "ID_DENTISTA": "Dr. Juan" } para pintar el select con JS
+const dentistsNames: Record<string, string> = {};
+dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
 ---
 
 <Layout
   title="Agendar Cita - Clínica Dental"
   description="Agenda tu cita dental online en minutos. Primera consulta GRATIS. Horarios flexibles de lunes a sábado."
 >
+  
+  <!-- === DATA OCULTA PARA EL JAVASCRIPT === -->
+  <div id="logic-data" 
+       data-relations={JSON.stringify(serviceToDentists)}
+       data-names={JSON.stringify(dentistsNames)}
+       class="hidden"></div>
+
   <!-- Hero -->
   <section class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -172,7 +210,7 @@ const { data: services } = await supabase
               2. Información de la Cita
             </h2>
 
-            <!-- Servicio (DINÁMICO DESDE BASE DE DATOS) -->
+            <!-- Servicio Dinámico -->
             <div>
               <label
                 for="service"
@@ -182,21 +220,39 @@ const { data: services } = await supabase
               </label>
               <select
                 id="service"
-                name="service"
+                name="service_id"
                 required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="">Selecciona un servicio</option>
-                <!-- Aquí inyectamos los servicios reales de Supabase -->
                 {services && services.map((service) => (
-                    <option value={service.id}>
-                        {service.name}
-                    </option>
+                    <option value={service.id}>{service.name}</option>
                 ))}
               </select>
             </div>
 
-            <!-- Fecha y Hora preferida -->
+            <!-- Dentista Dinámico (CON ID PARA JS) -->
+            <div id="dentist-container" class="transition-opacity duration-300">
+              <label
+                for="dentist"
+                class="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Profesional de preferencia (Opcional)
+              </label>
+              <select
+                id="dentist"
+                name="dentist_id"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
+              >
+                <option value="">Cualquiera disponible</option>
+                <!-- Se llenará con JS -->
+                {dentistRelations && dentistRelations.map((dentist) => (
+                    <option value={dentist.id}>Dr/a. {dentist.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <!-- Fecha y Hora -->
             <div class="grid md:grid-cols-2 gap-6">
               <div>
                 <label
@@ -271,7 +327,7 @@ const { data: services } = await supabase
               </div>
             </div>
 
-            <!-- Motivo de la consulta -->
+            <!-- Motivo -->
             <div>
               <label
                 for="reason"
@@ -311,11 +367,11 @@ const { data: services } = await supabase
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="">Selecciona una opción</option>
-                <option value="google">Google</option>
-                <option value="facebook">Facebook/Instagram</option>
-                <option value="referido">Referido de un amigo/familiar</option>
-                <option value="pasando">Pasaba por la zona</option>
-                <option value="otro">Otro</option>
+                <option value="Google">Google</option>
+                <option value="Redes Sociales">Facebook / Instagram</option>
+                <option value="Referido">Referido de un amigo/familiar</option>
+                <option value="Pasando">Pasaba por la zona</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
 
@@ -411,7 +467,7 @@ const { data: services } = await supabase
               viewBox="0 0 24 24"
             >
               <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
               ></path>
             </svg>
           </div>
@@ -433,6 +489,37 @@ const { data: services } = await supabase
 <script>
   import { supabase } from '../lib/supabase';
 
+  // === LÓGICA DE FILTRADO ===
+  const logicData = document.getElementById('logic-data');
+  const serviceToDentists = JSON.parse(logicData?.dataset.relations || '{}');
+  const dentistsNames = JSON.parse(logicData?.dataset.names || '{}');
+
+  const serviceSelect = document.getElementById('service') as HTMLSelectElement;
+  const dentistSelect = document.getElementById('dentist') as HTMLSelectElement;
+
+  if (serviceSelect && dentistSelect) {
+    serviceSelect.addEventListener('change', () => {
+        const serviceId = serviceSelect.value;
+        
+        // Limpiar
+        dentistSelect.innerHTML = '<option value="">Cualquiera disponible</option>';
+
+        if (!serviceId) return;
+
+        // Obtener dentistas válidos
+        const validDentists = serviceToDentists[serviceId] || [];
+
+        // Llenar select
+        validDentists.forEach((dentistId: string) => {
+            const opt = document.createElement('option');
+            opt.value = dentistId;
+            opt.textContent = `Dr/a. ${dentistsNames[dentistId]}`;
+            dentistSelect.appendChild(opt);
+        });
+    });
+  }
+
+  // === ENVÍO DEL FORMULARIO ===
   const form = document.getElementById('appointment-form') as HTMLFormElement;
   const formMessage = document.getElementById('form-message');
 
@@ -460,27 +547,29 @@ const { data: services } = await supabase
           throw new Error('No se pudo obtener información del negocio');
         }
 
-        // === CAMBIO AQUÍ: Ahora 'service' trae el ID, no el nombre ===
-        // Ya no necesitamos buscar en la BD, lo usamos directo
-        const serviceId = formData.get('service');
+        const dentistVal = formData.get('dentist_id');
+        const dentistId = dentistVal ? dentistVal : null;
 
         // Preparar datos de la cita
         const appointmentData = {
           business_id: business.id,
-          service_id: serviceId, // Usamos el ID directo
+          service_id: formData.get('service_id'),
+          dentist_id: dentistId,
           customer_name: formData.get('name'),
           customer_email: formData.get('email'),
           customer_phone: formData.get('phone'),
           appointment_date: formData.get('date'),
           appointment_time: formData.get('time'),
           status: 'pending',
-          notes: `
-Edad: ${formData.get('age') || 'No especificado'}
-Documento: ${formData.get('document') || 'No especificado'}
-Primera visita: ${formData.get('first_visit')}
-Motivo: ${formData.get('reason') || 'No especificado'}
-Cómo nos conoció: ${formData.get('source') || 'No especificado'}
-          `.trim()
+          
+          // COLUMNAS NORMALIZADAS
+          patient_age: formData.get('age') ? parseInt(formData.get('age') as string) : null,
+          patient_doc: formData.get('document'),
+          is_first_visit: formData.get('first_visit') === 'si',
+          consultation_reason: formData.get('reason'),
+          marketing_source: formData.get('source'),
+          
+          notes: '' 
         };
 
         // Insertar en Supabase
@@ -491,8 +580,8 @@ Cómo nos conoció: ${formData.get('source') || 'No especificado'}
 
         if (error) throw error;
 
-        // ÉXITO (Misma animación y mensaje bonito de antes)
-        formMessage.className = 'block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6';
+        // ÉXITO
+        formMessage.className = 'block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6 animate-fade-in';
         formMessage.innerHTML = `
           <svg class="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
