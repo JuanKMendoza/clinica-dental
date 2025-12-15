@@ -396,10 +396,12 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
       }
 
       // Mostrar/Ocultar
-      if(window.innerWidth >= 768) {
-         rowEl.style.display = show ? "table-row" : "none";
+      if (show) {
+          // Si estamos en PC (md), usa table-row, si no, usa el valor por defecto (que será block/flex según el CSS)
+          // La forma más segura es quitar el 'display: none' dejando vacío, para que el CSS decida.
+          rowEl.style.display = ""; 
       } else {
-         rowEl.style.display = show ? "flex" : "none";
+          rowEl.style.display = "none";
       }
     });
   }
