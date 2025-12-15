@@ -13,46 +13,44 @@ const { data: services } = await supabase
 // Dentistas CON sus servicios relacionados
 const { data: dentistRelations } = await supabase
   .from("dentists")
-  .select(`
+  .select(
+    `
     id, 
     name,
     dentist_services(service_id)
-  `)
+  `
+  )
   .eq("is_active", true)
   .order("name");
 
 // --- LÓGICA DE MAPEO (Cerebro del filtro) ---
-// Creamos un mapa: { "ID_SERVICIO": ["ID_DENTISTA_1", "ID_DENTISTA_2"] }
 const serviceToDentists: Record<string, string[]> = {};
-
-// Inicializamos arrays vacíos para cada servicio
-services?.forEach(s => serviceToDentists[s.id] = []);
-
-// Llenamos el mapa con los dentistas capaces
-dentistRelations?.forEach(dentist => {
-    // @ts-ignore
-    dentist.dentist_services.forEach((ds: any) => {
-        if (serviceToDentists[ds.service_id]) {
-            serviceToDentists[ds.service_id].push(dentist.id);
-        }
-    });
+services?.forEach((s) => (serviceToDentists[s.id] = []));
+dentistRelations?.forEach((dentist) => {
+  // @ts-ignore
+  dentist.dentist_services.forEach((ds: any) => {
+    if (serviceToDentists[ds.service_id]) {
+      serviceToDentists[ds.service_id].push(dentist.id);
+    }
+  });
 });
 
-// Mapa de Nombres: { "ID_DENTISTA": "Dr. Juan" } para pintar el select con JS
 const dentistsNames: Record<string, string> = {};
-dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
+dentistRelations?.forEach((d) => (dentistsNames[d.id] = d.name));
 ---
 
 <Layout
   title="Agendar Cita - Clínica Dental"
   description="Agenda tu cita dental online en minutos. Primera consulta GRATIS. Horarios flexibles de lunes a sábado."
 >
-  
   <!-- === DATA OCULTA PARA EL JAVASCRIPT === -->
-  <div id="logic-data" 
-       data-relations={JSON.stringify(serviceToDentists)}
-       data-names={JSON.stringify(dentistsNames)}
-       class="hidden"></div>
+  <div
+    id="logic-data"
+    data-relations={JSON.stringify(serviceToDentists)}
+    data-names={JSON.stringify(dentistsNames)}
+    class="hidden"
+  >
+  </div>
 
   <!-- Hero -->
   <section class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
@@ -100,7 +98,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
           </div>
         </div>
 
-        <form id="appointment-form" class="space-y-6">
+        <form id="appointment-form" class="space-y-6" novalidate>
           <!-- Datos Personales -->
           <div class="space-y-6">
             <h2
@@ -125,6 +123,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none"
                 placeholder="Ej: Juan Pérez"
               />
+              <p class="error-message hidden text-red-600 text-sm mt-1"></p>
             </div>
 
             <!-- Email y Teléfono -->
@@ -144,6 +143,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none"
                   placeholder="tu@email.com"
                 />
+                <p class="error-message hidden text-red-600 text-sm mt-1"></p>
               </div>
 
               <div>
@@ -161,6 +161,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none"
                   placeholder="310 123 4567"
                 />
+                <p class="error-message hidden text-red-600 text-sm mt-1"></p>
               </div>
             </div>
 
@@ -182,6 +183,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none"
                   placeholder="25"
                 />
+                <p class="error-message hidden text-red-600 text-sm mt-1"></p>
               </div>
 
               <div>
@@ -225,13 +227,17 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="">Selecciona un servicio</option>
-                {services && services.map((service) => (
-                    <option value={service.id}>{service.name}</option>
-                ))}
+                {
+                  services &&
+                    services.map((service) => (
+                      <option value={service.id}>{service.name}</option>
+                    ))
+                }
               </select>
+              <p class="error-message hidden text-red-600 text-sm mt-1"></p>
             </div>
 
-            <!-- Dentista Dinámico (CON ID PARA JS) -->
+            <!-- Dentista Dinámico -->
             <div id="dentist-container" class="transition-opacity duration-300">
               <label
                 for="dentist"
@@ -245,10 +251,12 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="">Cualquiera disponible</option>
-                <!-- Se llenará con JS -->
-                {dentistRelations && dentistRelations.map((dentist) => (
-                    <option value={dentist.id}>Dr/a. {dentist.name}</option>
-                ))}
+                {
+                  dentistRelations &&
+                    dentistRelations.map((dentist) => (
+                      <option value={dentist.id}>Dr/a. {dentist.name}</option>
+                    ))
+                }
               </select>
             </div>
 
@@ -269,6 +277,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   min={new Date().toISOString().split("T")[0]}
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none"
                 />
+                <p class="error-message hidden text-red-600 text-sm mt-1"></p>
               </div>
 
               <div>
@@ -296,6 +305,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   <option value="17:00">5:00 PM</option>
                   <option value="18:00">6:00 PM</option>
                 </select>
+                <p class="error-message hidden text-red-600 text-sm mt-1"></p>
               </div>
             </div>
 
@@ -325,6 +335,7 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
                   <span class="ml-2 text-gray-700">No, ya he venido antes</span>
                 </label>
               </div>
+              <p class="error-message hidden text-red-600 text-sm mt-1"></p>
             </div>
 
             <!-- Motivo -->
@@ -376,23 +387,27 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
             </div>
 
             <!-- Términos -->
-            <div class="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="terms"
-                name="terms"
-                required
-                class="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-600 rounded"
-              />
-              <label for="terms" class="text-sm text-gray-700">
-                Acepto la <a
-                  href="/privacidad"
-                  class="text-blue-600 hover:underline"
-                  >Política de Privacidad</a
-                >
-                y autorizo el tratamiento de mis datos personales para fines de agendamiento
-                y contacto *
-              </label>
+            <div>
+              <div class="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  name="terms"
+                  required
+                  class="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-600 rounded"
+                />
+                <label for="terms" class="text-sm text-gray-700">
+                  Acepto la <a
+                    href="/privacidad"
+                    class="text-blue-600 hover:underline"
+                    >Política de Privacidad</a
+                  >
+                  y autorizo el tratamiento de mis datos personales para fines de
+                  agendamiento y contacto *
+                </label>
+              </div>
+              <p class="error-message hidden text-red-600 text-sm mt-1 ml-7">
+              </p>
             </div>
           </div>
 
@@ -461,13 +476,15 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
           <div
             class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"
           >
+            <!-- Icono de WhatsApp mejorado -->
             <svg
-              class="w-8 h-8 text-green-600"
+              class="w-9 h-9 text-green-600"
               fill="currentColor"
               viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
             >
               <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
               ></path>
             </svg>
           </div>
@@ -476,9 +493,14 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
           <a
             href="https://wa.me/573102278592?text=Hola!%20Quiero%20agendar%20una%20cita"
             target="_blank"
-            class="inline-block bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600"
+            class="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors"
           >
-            💬 Abrir WhatsApp
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
+              ></path>
+            </svg>
+            <span>Abrir WhatsApp</span>
           </a>
         </div>
       </div>
@@ -487,107 +509,475 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
 </Layout>
 
 <script>
-  import { supabase } from '../lib/supabase';
+  import { supabase } from "../lib/supabase";
 
-  // === LÓGICA DE FILTRADO ===
-  const logicData = document.getElementById('logic-data');
-  const serviceToDentists = JSON.parse(logicData?.dataset.relations || '{}');
-  const dentistsNames = JSON.parse(logicData?.dataset.names || '{}');
+  // ==========================================
+  // FUNCIONES DE VALIDACIÓN
+  // ==========================================
 
-  const serviceSelect = document.getElementById('service') as HTMLSelectElement;
-  const dentistSelect = document.getElementById('dentist') as HTMLSelectElement;
+  /**
+   * Muestra un error en un campo específico
+   * @param field - Elemento del campo a marcar como error
+   * @param message - Mensaje de error a mostrar
+   */
+  function showError(field: HTMLElement, message: string) {
+    // Resaltar el campo con borde rojo
+    field.classList.add("border-red-500", "border-2");
+    field.classList.remove("border-gray-300");
+
+    // Mostrar mensaje de error
+    const errorMsg = field.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.textContent = message;
+      errorMsg.classList.remove("hidden");
+    }
+  }
+
+  /**
+   * Limpia los errores de un campo
+   * @param field - Elemento del campo a limpiar
+   */
+  function clearError(field: HTMLElement) {
+    field.classList.remove("border-red-500", "border-2");
+    field.classList.add("border-gray-300");
+
+    const errorMsg = field.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.classList.add("hidden");
+    }
+  }
+
+  /**
+   * Valida que un campo no esté vacío
+   * @param field - Campo a validar
+   * @param fieldName - Nombre del campo para el mensaje de error
+   * @returns true si es válido, false si está vacío
+   */
+  function validateRequired(
+    field: HTMLInputElement | HTMLSelectElement,
+    fieldName: string
+  ): boolean {
+    const value = field.value.trim();
+    if (!value) {
+      showError(field, `El campo ${fieldName} es obligatorio`);
+      return false;
+    }
+    clearError(field);
+    return true;
+  }
+
+  /**
+   * Valida el formato de un correo electrónico
+   * @param emailField - Campo del email a validar
+   * @returns true si el formato es válido
+   */
+  function validateEmail(emailField: HTMLInputElement): boolean {
+    const value = emailField.value.trim();
+
+    if (!value) {
+      showError(emailField, "El correo electrónico es obligatorio");
+      return false;
+    }
+
+    // Expresión regular para validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+      showError(
+        emailField,
+        "Por favor ingresa un correo electrónico válido (ej: usuario@correo.com)"
+      );
+      return false;
+    }
+
+    clearError(emailField);
+    return true;
+  }
+
+  /**
+   * Valida el formato de un número de teléfono
+   * @param phoneField - Campo del teléfono a validar
+   * @returns true si tiene al menos 7 dígitos
+   */
+  function validatePhone(phoneField: HTMLInputElement): boolean {
+    const value = phoneField.value.trim();
+
+    if (!value) {
+      showError(phoneField, "El teléfono es obligatorio");
+      return false;
+    }
+
+    // Extraer solo números
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length < 7) {
+      showError(
+        phoneField,
+        "Por favor ingresa un número de teléfono válido (mínimo 7 dígitos)"
+      );
+      return false;
+    }
+
+    clearError(phoneField);
+    return true;
+  }
+
+  /**
+   * Valida que la edad esté en un rango válido
+   * @param ageField - Campo de edad a validar
+   * @returns true si la edad es válida (opcional)
+   */
+  function validateAge(ageField: HTMLInputElement): boolean {
+    const value = ageField.value.trim();
+
+    // La edad es opcional, si está vacía es válido
+    if (!value) {
+      clearError(ageField);
+      return true;
+    }
+
+    const age = parseInt(value);
+    if (isNaN(age) || age < 1 || age > 120) {
+      showError(ageField, "Por favor ingresa una edad válida (1-120 años)");
+      return false;
+    }
+
+    clearError(ageField);
+    return true;
+  }
+
+  /**
+   * Valida que se haya seleccionado una opción de radio button
+   * @param radioName - Nombre del grupo de radio buttons
+   * @param fieldLabel - Etiqueta del campo para el mensaje de error
+   * @returns true si hay una opción seleccionada
+   */
+  function validateRadio(radioName: string, fieldLabel: string): boolean {
+    const radios = document.getElementsByName(
+      radioName
+    ) as NodeListOf<HTMLInputElement>;
+    const isChecked = Array.from(radios).some((radio) => radio.checked);
+
+    if (!isChecked) {
+      const firstRadio = radios[0];
+      const container = firstRadio.closest("div")?.parentElement;
+      const errorMsg = container?.querySelector(".error-message");
+
+      if (errorMsg) {
+        errorMsg.textContent = `Por favor selecciona una opción para ${fieldLabel}`;
+        errorMsg.classList.remove("hidden");
+      }
+      return false;
+    }
+
+    // Limpiar error si existe
+    const firstRadio = radios[0];
+    const container = firstRadio.closest("div")?.parentElement;
+    const errorMsg = container?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.classList.add("hidden");
+    }
+
+    return true;
+  }
+
+  /**
+   * Valida que el checkbox de términos esté marcado
+   * @param checkbox - Elemento checkbox a validar
+   * @returns true si está marcado
+   */
+  function validateCheckbox(checkbox: HTMLInputElement): boolean {
+    if (!checkbox.checked) {
+      const errorMsg = checkbox
+        .closest("div")
+        ?.parentElement?.querySelector(".error-message");
+      if (errorMsg) {
+        errorMsg.textContent =
+          "Debes aceptar los términos y condiciones para continuar";
+        errorMsg.classList.remove("hidden");
+      }
+      return false;
+    }
+
+    // Limpiar error
+    const errorMsg = checkbox
+      .closest("div")
+      ?.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.classList.add("hidden");
+    }
+
+    return true;
+  }
+
+  /**
+   * Valida que la fecha no sea anterior a hoy
+   * @param dateField - Campo de fecha a validar
+   * @returns true si la fecha es válida
+   */
+  function validateDate(dateField: HTMLInputElement): boolean {
+    const value = dateField.value;
+
+    if (!value) {
+      showError(dateField, "La fecha es obligatoria");
+      return false;
+    }
+
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      showError(dateField, "La fecha no puede ser anterior a hoy");
+      return false;
+    }
+
+    clearError(dateField);
+    return true;
+  }
+
+  /**
+   * Valida el formulario completo antes de enviarlo
+   * @returns true si todos los campos son válidos
+   */
+  function validateForm(): boolean {
+    let isValid = true;
+
+    // Validar campos de texto obligatorios
+    const nameField = document.getElementById("name") as HTMLInputElement;
+    if (!validateRequired(nameField, "nombre completo")) isValid = false;
+
+    // Validar email
+    const emailField = document.getElementById("email") as HTMLInputElement;
+    if (!validateEmail(emailField)) isValid = false;
+
+    // Validar teléfono
+    const phoneField = document.getElementById("phone") as HTMLInputElement;
+    if (!validatePhone(phoneField)) isValid = false;
+
+    // Validar edad (opcional pero debe ser válida si se llena)
+    const ageField = document.getElementById("age") as HTMLInputElement;
+    if (!validateAge(ageField)) isValid = false;
+
+    // Validar servicio
+    const serviceField = document.getElementById(
+      "service"
+    ) as HTMLSelectElement;
+    if (!validateRequired(serviceField, "servicio")) isValid = false;
+
+    // Validar fecha
+    const dateField = document.getElementById("date") as HTMLInputElement;
+    if (!validateDate(dateField)) isValid = false;
+
+    // Validar hora
+    const timeField = document.getElementById("time") as HTMLSelectElement;
+    if (!validateRequired(timeField, "hora")) isValid = false;
+
+    // Validar radio button de primera visita
+    if (!validateRadio("first_visit", "¿Es tu primera visita?"))
+      isValid = false;
+
+    // Validar checkbox de términos
+    const termsCheckbox = document.getElementById("terms") as HTMLInputElement;
+    if (!validateCheckbox(termsCheckbox)) isValid = false;
+
+    return isValid;
+  }
+
+  // ==========================================
+  // LÓGICA DE FILTRADO DE DENTISTAS
+  // ==========================================
+
+  const logicData = document.getElementById("logic-data");
+  const serviceToDentists = JSON.parse(logicData?.dataset.relations || "{}");
+  const dentistsNames = JSON.parse(logicData?.dataset.names || "{}");
+
+  const serviceSelect = document.getElementById("service") as HTMLSelectElement;
+  const dentistSelect = document.getElementById("dentist") as HTMLSelectElement;
 
   if (serviceSelect && dentistSelect) {
-    serviceSelect.addEventListener('change', () => {
-        const serviceId = serviceSelect.value;
-        
-        // Limpiar
-        dentistSelect.innerHTML = '<option value="">Cualquiera disponible</option>';
+    serviceSelect.addEventListener("change", () => {
+      const serviceId = serviceSelect.value;
 
-        if (!serviceId) return;
+      // Limpiar select de dentistas
+      dentistSelect.innerHTML =
+        '<option value="">Cualquiera disponible</option>';
 
-        // Obtener dentistas válidos
-        const validDentists = serviceToDentists[serviceId] || [];
+      if (!serviceId) return;
 
-        // Llenar select
-        validDentists.forEach((dentistId: string) => {
-            const opt = document.createElement('option');
-            opt.value = dentistId;
-            opt.textContent = `Dr/a. ${dentistsNames[dentistId]}`;
-            dentistSelect.appendChild(opt);
-        });
+      // Obtener dentistas válidos para el servicio seleccionado
+      const validDentists = serviceToDentists[serviceId] || [];
+
+      // Llenar select con dentistas disponibles
+      validDentists.forEach((dentistId: string) => {
+        const opt = document.createElement("option");
+        opt.value = dentistId;
+        opt.textContent = `Dr/a. ${dentistsNames[dentistId]}`;
+        dentistSelect.appendChild(opt);
+      });
     });
   }
 
-  // === ENVÍO DEL FORMULARIO ===
-  const form = document.getElementById('appointment-form') as HTMLFormElement;
-  const formMessage = document.getElementById('form-message');
+  // ==========================================
+  // VALIDACIÓN EN TIEMPO REAL (OPCIONAL)
+  // ==========================================
+
+  // Agregar validación en tiempo real cuando el usuario sale del campo
+  const nameField = document.getElementById("name") as HTMLInputElement;
+  nameField?.addEventListener("blur", () =>
+    validateRequired(nameField, "nombre completo")
+  );
+
+  const emailField = document.getElementById("email") as HTMLInputElement;
+  emailField?.addEventListener("blur", () => validateEmail(emailField));
+
+  const phoneField = document.getElementById("phone") as HTMLInputElement;
+  phoneField?.addEventListener("blur", () => validatePhone(phoneField));
+
+  const ageField = document.getElementById("age") as HTMLInputElement;
+  ageField?.addEventListener("blur", () => validateAge(ageField));
+
+  const dateField = document.getElementById("date") as HTMLInputElement;
+  dateField?.addEventListener("blur", () => validateDate(dateField));
+
+  // Validación en tiempo real para el campo de servicio
+  const serviceField = document.getElementById("service") as HTMLSelectElement;
+  serviceField?.addEventListener("change", () => {
+    if (serviceField.value) {
+      clearError(serviceField);
+    }
+  });
+
+  // Validación en tiempo real para el campo de hora
+  const timeField = document.getElementById("time") as HTMLSelectElement;
+  timeField?.addEventListener("change", () => {
+    if (timeField.value) {
+      clearError(timeField);
+    }
+  });
+
+  // Validación en tiempo real para radio buttons de primera visita
+  const firstVisitRadios = document.getElementsByName(
+    "first_visit"
+  ) as NodeListOf<HTMLInputElement>;
+  firstVisitRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      // Limpiar error cuando se selecciona cualquier opción
+      const container = radio.closest("div")?.parentElement;
+      const errorMsg = container?.querySelector(".error-message");
+      if (errorMsg) {
+        errorMsg.classList.add("hidden");
+      }
+    });
+  });
+
+  // Validación en tiempo real para checkbox de términos
+  const termsCheckbox = document.getElementById("terms") as HTMLInputElement;
+  termsCheckbox?.addEventListener("change", () => {
+    if (termsCheckbox.checked) {
+      const errorMsg = termsCheckbox
+        .closest("div")
+        ?.parentElement?.querySelector(".error-message");
+      if (errorMsg) {
+        errorMsg.classList.add("hidden");
+      }
+    }
+  });
+
+  // ==========================================
+  // ENVÍO DEL FORMULARIO
+  // ==========================================
+
+  const form = document.getElementById("appointment-form") as HTMLFormElement;
+  const formMessage = document.getElementById("form-message");
 
   if (form && formMessage) {
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      
-      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+      // VALIDAR FORMULARIO ANTES DE ENVIAR
+      if (!validateForm()) {
+        // Hacer scroll al primer error
+        const firstError = document.querySelector(".border-red-500");
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        // Mostrar mensaje general de error
+        formMessage.className =
+          "block p-4 rounded-lg bg-red-50 border border-red-200 text-center mt-6";
+        formMessage.innerHTML = `
+          <p class="text-red-800 font-semibold">⚠️ Por favor completa todos los campos obligatorios correctamente</p>
+        `;
+
+        setTimeout(() => {
+          formMessage.classList.add("hidden");
+        }, 5000);
+
+        return;
+      }
+
+      const submitButton = form.querySelector(
+        'button[type="submit"]'
+      ) as HTMLButtonElement;
       const originalText = submitButton.innerHTML;
-      
+
       // Mostrar estado de carga
       submitButton.disabled = true;
-      submitButton.innerHTML = '<span>Guardando tu cita...</span>';
-      
+      submitButton.innerHTML = "<span>Guardando tu cita...</span>";
+
       try {
         const formData = new FormData(form);
-        
-        // Obtener el ID del negocio (tu clínica)
+
+        // Obtener el ID del negocio
         const { data: business } = await supabase
-          .from('businesses')
-          .select('id')
+          .from("businesses")
+          .select("id")
           .single();
 
         if (!business) {
-          throw new Error('No se pudo obtener información del negocio');
+          throw new Error("No se pudo obtener información del negocio");
         }
 
-        const dentistVal = formData.get('dentist_id');
+        const dentistVal = formData.get("dentist_id");
         const dentistId = dentistVal ? dentistVal : null;
 
         // Preparar datos de la cita
         const appointmentData = {
           business_id: business.id,
-          service_id: formData.get('service_id'),
+          service_id: formData.get("service_id"),
           dentist_id: dentistId,
-          customer_name: formData.get('name'),
-          customer_email: formData.get('email'),
-          customer_phone: formData.get('phone'),
-          appointment_date: formData.get('date'),
-          appointment_time: formData.get('time'),
-          status: 'pending',
-          
-          // COLUMNAS NORMALIZADAS
-          patient_age: formData.get('age') ? parseInt(formData.get('age') as string) : null,
-          patient_doc: formData.get('document'),
-          is_first_visit: formData.get('first_visit') === 'si',
-          consultation_reason: formData.get('reason'),
-          marketing_source: formData.get('source'),
-          
-          notes: '' 
+          customer_name: formData.get("name"),
+          customer_email: formData.get("email"),
+          customer_phone: formData.get("phone"),
+          appointment_date: formData.get("date"),
+          appointment_time: formData.get("time"),
+          status: "pending",
+          patient_age: formData.get("age")
+            ? parseInt(formData.get("age") as string)
+            : null,
+          patient_doc: formData.get("document"),
+          is_first_visit: formData.get("first_visit") === "si",
+          consultation_reason: formData.get("reason"),
+          marketing_source: formData.get("source"),
+          notes: "",
         };
 
         // Insertar en Supabase
         const { data, error } = await supabase
-          .from('appointments')
+          .from("appointments")
           .insert([appointmentData])
           .select();
 
         if (error) throw error;
 
         // ÉXITO
-        formMessage.className = 'block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6 animate-fade-in';
+        formMessage.className =
+          "block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6 animate-fade-in";
         formMessage.innerHTML = `
           <svg class="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
           <h3 class="text-xl font-bold text-green-900 mb-2">¡Cita agendada exitosamente!</h3>
-          <p class="text-green-800">Tu cita ha sido registrada para el <strong>${formData.get('date')}</strong> a las <strong>${formData.get('time')}</strong></p>
+          <p class="text-green-800">Tu cita ha sido registrada para el <strong>${formData.get("date")}</strong> a las <strong>${formData.get("time")}</strong></p>
           <p class="text-sm text-green-700 mt-4">Te contactaremos en máximo 2 horas para confirmar. Revisa tu email y WhatsApp 📱</p>
           <div class="mt-6">
             <a href="/" class="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
@@ -595,18 +985,18 @@ dentistRelations?.forEach(d => dentistsNames[d.id] = d.name);
             </a>
           </div>
         `;
-        
+
         form.reset();
-        formMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
+        formMessage.scrollIntoView({ behavior: "smooth", block: "center" });
       } catch (error: any) {
-        console.error('Error:', error);
-        
+        console.error("Error:", error);
+
         // ERROR
-        formMessage.className = 'block p-6 rounded-lg bg-red-50 border-2 border-red-200 text-center mt-6';
+        formMessage.className =
+          "block p-6 rounded-lg bg-red-50 border-2 border-red-200 text-center mt-6";
         formMessage.innerHTML = `
           <h3 class="text-xl font-bold text-red-900 mb-2">Hubo un error al agendar</h3>
-          <p class="text-red-800 mb-4">${error.message || 'Por favor intenta de nuevo o contáctanos por WhatsApp.'}</p>
+          <p class="text-red-800 mb-4">${error.message || "Por favor intenta de nuevo o contáctanos por WhatsApp."}</p>
           <a href="https://wa.me/573102278592" target="_blank" class="inline-block bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600">
             💬 Abrir WhatsApp
           </a>
