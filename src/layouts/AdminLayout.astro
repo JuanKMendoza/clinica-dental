@@ -9,7 +9,6 @@ interface Props {
 const { title } = Astro.props;
 const currentPath = Astro.url.pathname;
 
-// Definición del Menú (Centralizada para fácil mantenimiento)
 const menuItems = [
   { 
     label: "Dashboard", 
@@ -18,31 +17,24 @@ const menuItems = [
   },
   { 
     label: "Citas", 
-    href: "/admin/dashboard#citas", // Apunta al mismo dash por ahora o a una vista específica
+    href: "/admin/citas", // Preparado para la separación
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />` 
   },
   { 
     label: "Configuración", 
     href: "/admin/configuracion", 
-    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.1-.444 1.364l-1.45.82c-.875.49-1.923.076-2.348-.723-.625-1.168-1.077-2.416-1.332-3.733-.122-.632.222-1.25.795-1.488l1.798-.753zm.985-11.967a13.9 13.9 0 01-.985-2.783c-.246-.55-.06-1.1.444-1.364l1.45-.82c.875-.49 1.923-.076 2.348.723.625 1.168 1.078 2.416 1.332 3.733.122.632-.222 1.25-.795 1.488l-1.798.753zm5.333 5.983a13.9 13.9 0 012.783.985c.55.247 1.1.06 1.364-.444l.82-1.45c.49-.875.076-1.923-.723-2.348-1.168-.625-2.416-1.078-3.733-1.332-.632-.122-1.25.222-1.488.795l-.753 1.798z" />` 
+    // Icono Premium: Engranaje Geométrico Limpio
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />` 
   }
 ];
 
-// Helper para clases activas
 const getLinkClass = (path: string) => {
   const isActive = currentPath === path || (path !== '/admin/dashboard' && currentPath.startsWith(path));
-  
-  // Desktop Styles
-  const desktop = isActive 
-    ? "bg-blue-50 text-blue-700 font-semibold border-r-4 border-blue-600" 
-    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900";
-    
-  // Mobile Styles (Bottom Bar)
-  const mobile = isActive 
-    ? "text-blue-600" 
-    : "text-gray-400 hover:text-gray-600";
-
-  return { desktop, mobile, isActive };
+  return {
+    desktop: isActive ? "bg-blue-50 text-blue-700 font-semibold border-r-4 border-blue-600" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900",
+    mobile: isActive ? "text-blue-600" : "text-gray-400 hover:text-gray-600",
+    isActive
+  };
 };
 ---
 
@@ -54,25 +46,19 @@ const getLinkClass = (path: string) => {
     <title>{title} | Admin Panel</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
-  <body class="bg-gray-50/50 font-sans antialiased text-gray-900 h-screen overflow-hidden flex flex-col md:flex-row">
+  <body class="bg-gray-50/50 font-sans antialiased text-gray-900 h-[100dvh] flex flex-col md:flex-row overflow-hidden">
     
-    <!-- ==============================================
-         1. SIDEBAR (DESKTOP) - Estilo Panze Studio
-         ============================================== -->
-    <aside class="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col h-full shadow-[2px_0_20px_rgba(0,0,0,0.02)] z-20">
-      
-      <!-- Logo Area -->
+    <!-- SIDEBAR (DESKTOP) -->
+    <aside class="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col h-full shadow-sm z-20">
       <div class="h-20 flex items-center px-8 border-b border-gray-50">
-        <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity" title="Ir al sitio web">
           <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200">D</div>
           <span class="font-bold text-xl text-gray-800 tracking-tight">Dental<span class="text-blue-600">App</span></span>
-        </div>
+        </a>
       </div>
 
-      <!-- Navigation -->
       <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         <p class="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Principal</p>
-        
         {menuItems.map((item) => {
           const styles = getLinkClass(item.href);
           return (
@@ -84,7 +70,6 @@ const getLinkClass = (path: string) => {
         })}
       </nav>
 
-      <!-- User Profile (Bottom Sidebar) -->
       <div class="p-4 border-t border-gray-50">
         <button id="logout-btn-desktop" class="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-red-50 transition-colors group">
           <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold group-hover:bg-red-100 group-hover:text-red-500">
@@ -98,36 +83,28 @@ const getLinkClass = (path: string) => {
       </div>
     </aside>
 
-
-    <!-- ==============================================
-         2. MAIN CONTENT WRAPPER
-         ============================================== -->
-    <main class="flex-1 h-full overflow-hidden flex flex-col relative bg-gray-50/50">
-      
-      <!-- Top Header Mobile (Solo visible en móvil) -->
-      <header class="md:hidden bg-white/80 backdrop-blur-md border-b border-gray-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
-        <div class="flex items-center gap-2">
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col h-full relative w-full">
+      <!-- Top Header Mobile -->
+      <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-gray-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
+        <a href="/" class="flex items-center gap-2">
           <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">D</div>
           <span class="font-bold text-lg text-gray-900">Dental<span class="text-blue-600">App</span></span>
-        </div>
-        <button id="logout-btn-mobile" class="text-gray-400 hover:text-red-500">
+        </a>
+        <button id="logout-btn-mobile" class="text-gray-400 hover:text-red-500 p-2">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
         </button>
       </header>
 
-      <!-- Scrollable Content Area -->
-      <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 pb-24 md:pb-8">
+      <!-- Scrollable Area -->
+      <!-- Corrección: pb-28 para que la barra inferior no tape nada -->
+      <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 pb-28 md:pb-8 w-full">
         <slot />
       </div>
-
     </main>
 
-
-    <!-- ==============================================
-         3. BOTTOM NAVIGATION (MÓVIL) - Estilo App Nativa
-         ============================================== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe pt-2 px-6 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex justify-between items-center h-[80px]">
-      
+    <!-- BOTTOM NAVIGATION (MÓVIL) -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe pt-2 px-8 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex justify-between items-center h-[80px]">
       {menuItems.map((item) => {
         const styles = getLinkClass(item.href);
         return (
@@ -140,47 +117,28 @@ const getLinkClass = (path: string) => {
           </a>
         )
       })}
-
-      <!-- Botón Extra para futuro menú -->
-      <button class="flex flex-col items-center gap-1 p-2 text-gray-400 active:scale-95">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-        </svg>
-        <span class="text-[10px] font-medium">Menú</span>
-      </button>
-
     </nav>
 
   </body>
 </html>
 
 <style>
-  /* Soporte para áreas seguras en iPhone (el notch de abajo) */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-  }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
 </style>
 
 <script>
   import Swal from "sweetalert2";
   import { supabase } from "../lib/supabase";
 
-  // Lógica de Logout unificada
   const handleLogout = async () => {
     const result = await Swal.fire({
       title: '¿Cerrar sesión?',
-      text: "Tendrás que ingresar nuevamente.",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#111827',
       cancelButtonColor: '#6B7280',
       confirmButtonText: 'Sí, salir',
-      cancelButtonText: 'Cancelar',
-      customClass: {
-        popup: 'rounded-2xl',
-        confirmButton: 'rounded-xl',
-        cancelButton: 'rounded-xl'
-      }
+      cancelButtonText: 'Cancelar'
     });
 
     if (result.isConfirmed) {

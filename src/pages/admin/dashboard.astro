@@ -2,802 +2,157 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { supabase } from "../../lib/supabase";
 
-// 1. AUTH
+// 1. AUTH (Server Side)
 const accessToken = Astro.cookies.get("sb-access-token")?.value;
 const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
 
 if (accessToken && refreshToken) {
   await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+} else {
+  return Astro.redirect("/admin/login");
 }
 
-// 2. DATOS
+// 2. DATOS PARA KPI Y RESUMEN
 const { data: appointments } = await supabase
   .from("appointments")
-  .select(`*, services (name, duration, price), dentists (name)`)
-  .order("appointment_date", { ascending: true })
-  .order("appointment_time", { ascending: true });
-
-const { data: servicesList } = await supabase.from("services").select("id, name, business_id").eq("is_active", true).order("name");
-const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("is_active", true).order("name");
-const defaultBusinessId = servicesList?.[0]?.business_id || "";
+  .select(`*, services (name), dentists (name)`)
+  .order("created_at", { ascending: false });
 
 const pending = appointments?.filter((a) => a.status === "pending").length || 0;
 const confirmed = appointments?.filter((a) => a.status === "confirmed").length || 0;
-const cancelled = appointments?.filter((a) => a.status === "cancelled").length || 0;
 const completed = appointments?.filter((a) => a.status === "completed").length || 0;
 
-const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
+// Solo mostramos los 5 más recientes en el Dashboard
+const recentActivity = appointments?.slice(0, 5) || [];
 ---
-<!-- dashboard.astro -->
-<AdminLayout title="Admin Panel">
-  <div id="app-data" data-services={JSON.stringify(servicesList)} data-dentists={JSON.stringify(dentistsList)} data-business-id={defaultBusinessId}></div>
 
-  <div id="main-content" class="min-h-screen bg-gray-50/50 py-8 hidden relative">
+<AdminLayout title="Panel de Control">
+  
+  <div class="max-w-7xl mx-auto">
     
-    <!-- MODAL -->
-    <div id="confirmation-modal" class="fixed inset-0 z-[9999] hidden" role="dialog" aria-modal="true">
-        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop"></div>
-        <div class="fixed inset-0 z-10 overflow-y-auto">
-          <div class="flex min-h-full items-center justify-center p-4 text-center">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:w-full sm:max-w-md scale-95 opacity-0" id="modal-panel">
-              <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                  <div id="modal-icon-bg" class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10"><svg id="modal-icon" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"></svg></div>
-                  <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                    <h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">Confirmar</h3>
-                    <div class="mt-2"><p class="text-sm text-gray-500" id="modal-message">¿Seguro?</p></div>
-                  </div>
-                </div>
-              </div>
-              <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
-                <button type="button" id="confirm-action-btn" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-all">Confirmar</button>
-                <button type="button" id="cancel-action-btn" class="mt-3 inline-flex w-full justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition-all">Cancelar</button>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- WELCOME HERO -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">Hola, Doctor 👋</h1>
+      <p class="text-gray-500">Aquí tienes el resumen de tu clínica hoy.</p>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- HEADER & KPIs -->
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div class="flex items-center gap-4 w-full md:w-auto">
-            <div class="bg-blue-600 p-3 rounded-xl text-white shadow-blue-200 shadow-lg"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg></div>
-            <div><h1 class="text-2xl font-bold text-gray-900 tracking-tight">Agenda Médica</h1><p class="text-sm text-gray-500">Administración</p></div>
-        </div>
-        <div class="flex flex-wrap gap-3 w-full md:w-auto">
-          <button id="new-appointment-btn" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg> Nueva Cita
-          </button>
-          <a href="/" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-center">Volver al Sitio</a>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 hover:border-blue-200 transition-colors">
-            <div class="flex justify-between"><span class="text-sm font-semibold text-gray-400 uppercase">Total</span><span class="p-1.5 bg-gray-50 rounded-lg text-gray-600">📊</span></div>
+    <!-- KPIs GRIDS -->
+    <!-- KPIs / RESUMEN -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Total -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md">
+            <div class="flex justify-between items-start">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                <div class="p-1.5 bg-gray-50 rounded-lg text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                </div>
+            </div>
             <span class="text-3xl font-bold text-gray-900">{appointments?.length || 0}</span>
         </div>
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 hover:border-yellow-200 transition-colors">
-            <div class="flex justify-between"><span class="text-sm font-semibold text-yellow-600/80 uppercase">Pendientes</span><span class="p-1.5 bg-yellow-50 rounded-lg text-yellow-600">⏳</span></div>
+
+        <!-- Pendientes -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-yellow-200">
+            <div class="flex justify-between items-start">
+                <span class="text-xs font-bold text-yellow-600/80 uppercase tracking-wider">Pendientes</span>
+                <div class="p-1.5 bg-yellow-50 rounded-lg text-yellow-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+            </div>
             <span class="text-3xl font-bold text-gray-900">{pending}</span>
         </div>
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 hover:border-emerald-200 transition-colors">
-            <div class="flex justify-between"><span class="text-sm font-semibold text-emerald-600/80 uppercase">Confirmadas</span><span class="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">👍</span></div>
+
+        <!-- Confirmadas -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-blue-200">
+            <div class="flex justify-between items-start">
+                <span class="text-xs font-bold text-blue-600/80 uppercase tracking-wider">Confirmadas</span>
+                <div class="p-1.5 bg-blue-50 rounded-lg text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
+                </div>
+            </div>
             <span class="text-3xl font-bold text-gray-900">{confirmed}</span>
         </div>
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 hover:border-blue-200 transition-colors">
-            <div class="flex justify-between"><span class="text-sm font-semibold text-blue-600/80 uppercase">Completadas</span><span class="p-1.5 bg-blue-50 rounded-lg text-blue-600">✅</span></div>
+
+        <!-- Completadas -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-emerald-200">
+            <div class="flex justify-between items-start">
+                <span class="text-xs font-bold text-emerald-600/80 uppercase tracking-wider">Completadas</span>
+                <div class="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+            </div>
             <span class="text-3xl font-bold text-gray-900">{completed}</span>
         </div>
-      </div>
+    </div>
 
-      <!-- FILTROS -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <div class="md:col-span-3">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label>
-                <select id="filter-date" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                    <option value="all">📅 Todo el historial</option>
-                    <option value="today">📆 Hoy</option>
-                    <option value="week">📅 Esta semana</option>
-                    <option value="month">📅 Este mes</option>
-                </select>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- ACCESOS RÁPIDOS -->
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl lg:col-span-1">
+        <h3 class="text-lg font-bold mb-4">Accesos Rápidos</h3>
+        <div class="space-y-3">
+          <a href="/admin/citas" class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 backdrop-blur-sm group">
+            <div class="w-10 h-10 rounded-lg bg-white text-blue-600 flex items-center justify-center shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
             </div>
-            <div class="md:col-span-3">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label>
-                <select id="filter-status" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                    <option value="all">🔄 Todos</option>
-                    <option value="pending">⏳ Pendientes</option>
-                    <option value="confirmed">👍 Confirmadas</option>
-                    <option value="completed">✅ Completadas</option>
-                    <option value="cancelled">🚫 Canceladas</option>
-                </select>
+            <div>
+              <p class="font-bold text-sm">Nueva Cita</p>
+              <p class="text-xs text-blue-100 group-hover:text-white">Agendar paciente</p>
             </div>
-            <div class="md:col-span-3">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Profesional</label>
-                <select id="filter-dentist" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                    <option value="all">👨‍⚕️ Todos</option>
-                    <option value="unassigned">⚠️ Sin Asignar</option>
-                    {dentistsList && dentistsList.map(d => <option value={d.id}>{d.name}</option>)}
-                </select>
+          </a>
+
+          <a href="/admin/configuracion" class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all border border-white/10 backdrop-blur-sm group">
+            <div class="w-10 h-10 rounded-lg bg-white text-purple-600 flex items-center justify-center shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1zm-5 8.274l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L5 10.274zm10 0l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L15 10.274z" clip-rule="evenodd" /></svg>
             </div>
-            
-            <div class="md:col-span-3">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar</label>
-                <input type="text" id="search-input" autocomplete="off" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50" placeholder="Paciente o teléfono...">
+            <div>
+              <p class="font-bold text-sm">Doctores</p>
+              <p class="text-xs text-blue-100 group-hover:text-white">Gestionar equipo</p>
             </div>
-        </div>
-        <div class="flex justify-end gap-2 mt-4">
-            <button id="clear-filters" class="text-sm text-gray-500 hover:text-blue-600 px-3 py-2">Limpiar</button>
-            <button id="export-excel" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 shadow-sm flex items-center gap-1.5 transition-all hover:scale-105">Excel</button>
+          </a>
         </div>
       </div>
 
-      <!-- TABLA PRINCIPAL -->
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="bg-gray-50/50 border-b border-gray-100">
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Paciente</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Profesional</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Servicio</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
-                <th class="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Acciones</th>
+      <!-- ÚLTIMA ACTIVIDAD (Solo Lectura) -->
+      <div class="bg-white rounded-3xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-gray-50 flex justify-between items-center">
+          <h3 class="font-bold text-gray-900">Actividad Reciente</h3>
+          <a href="/admin/citas" class="text-xs font-bold text-blue-600 hover:text-blue-800">Ver todo →</a>
+        </div>
+        
+        <div class="flex-1 overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-gray-50 text-gray-500 font-medium">
+              <tr>
+                <th class="px-6 py-3">Paciente</th>
+                <th class="px-6 py-3">Fecha</th>
+                <th class="px-6 py-3">Estado</th>
               </tr>
             </thead>
-            <tbody id="appointments-tbody" class="divide-y divide-gray-50">
-  {
-    appointments && appointments.map((apt) => {
-        const dateObj = new Date(apt.appointment_date + 'T00:00:00');
-        const dayName = dateObj.toLocaleDateString('es-CO', { weekday: 'short' });
-        const dayNum = dateObj.toLocaleDateString('es-CO', { day: 'numeric' });
-        const monthName = dateObj.toLocaleDateString('es-CO', { month: 'short' });
-        
-        return (
-        <tr 
-            class="hover:bg-blue-50/30 transition-colors group search-item"
-            style="display: table-row;"
-            data-status={apt.status}
-            data-date={apt.appointment_date}
-            data-dentist-id={apt.dentist_id || "null"} 
-            data-search={`${apt.customer_name} ${apt.customer_phone} ${apt.customer_email}`}
-            
-            data-name={apt.customer_name}
-            data-phone={apt.customer_phone}
-            data-email={apt.customer_email || ''}
-            data-service={apt.services?.name || 'N/A'}
-            data-time={apt.appointment_time}
-            data-age={apt.patient_age}
-            data-doc={apt.patient_doc}
-            data-reason={apt.consultation_reason}
-            data-source={apt.marketing_source}
-            data-first={apt.is_first_visit ? 'Sí' : 'No'}
-            data-dentist-name={apt.dentists?.name || "No asignado"}
-        >
-          {/* FECHA */}
-          <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="flex flex-col items-center justify-center w-12 h-12 bg-gray-100 rounded-lg border border-gray-200"><span class="text-[10px] uppercase font-bold text-gray-500 leading-none">{monthName}</span><span class="text-lg font-bold text-gray-900 leading-none mt-0.5">{dayNum}</span></div><div class="flex flex-col"><span class="text-sm font-medium text-gray-900 capitalize">{dayName}</span><span class="text-sm text-gray-500 font-mono bg-gray-100 px-1.5 rounded text-center">{apt.appointment_time.slice(0, 5)}</span></div></div></td>
-          
-          {/* PACIENTE */}
-          <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">{getInitials(apt.customer_name)}</div><div class="text-sm font-semibold text-gray-900">{apt.customer_name}</div></div></td>
-          
-          {/* PROFESIONAL */}
-          <td class="px-6 py-4">
-            {apt.dentists?.name ? (
-                <div class="flex items-center gap-2"><span class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs">👨‍⚕️</span><span class="text-sm text-gray-700 font-medium">{apt.dentists.name}</span></div>
-            ) : (
-                <span class="text-xs text-gray-400 italic">No asignado</span>
-            )}
-          </td>
-
-          {/* CONTACTO */}
-          <td class="px-6 py-4"><div class="flex flex-col items-start gap-2"><a href={`https://wa.me/57${apt.customer_phone.replace(/\D/g,'')}`} target="_blank" class="group flex items-center gap-2 px-3 py-1.5 bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white rounded-full transition-all duration-300 border border-[#25D366]/20 shadow-sm"><svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg><span class="text-xs font-bold font-mono tracking-wide">{apt.customer_phone}</span></a>{apt.customer_email && (<div class="flex items-center gap-1.5 text-xs text-gray-400 pl-1 group-hover:text-gray-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg><span class="truncate max-w-[140px]" title={apt.customer_email}>{apt.customer_email}</span></div>)}</div></td>
-          
-          {/* SERVICIO */}
-          <td class="px-6 py-4"><div class="text-sm text-gray-900 font-medium">{apt.services?.name || "General"}</div><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 mt-1">⏱ {apt.services?.duration || 30} min</span></td>
-          
-          {/* ESTADO */}
-          <td class="px-6 py-4 whitespace-nowrap">{apt.status === "pending" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">⏳ Pendiente</span>}{apt.status === "confirmed" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">👍 Confirmada</span>}{apt.status === "completed" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">✅ Completada</span>}{apt.status === "cancelled" && <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">🚫 Cancelada</span>}</td>
-          
-          {/* === ACCIONES === */}
-          <td class="px-6 py-4 whitespace-nowrap text-right"><div class="flex justify-end items-center gap-2">
-            
-            {/* Ver Ficha */}
-            <button title="Ver Ficha" data-id={apt.id} data-action="view_details" data-name={apt.customer_name} data-age={apt.patient_age} data-doc={apt.patient_doc} data-reason={apt.consultation_reason} data-source={apt.marketing_source} data-dentist={apt.dentists?.name || "No asignado"} class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-600 transition-all shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" /><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
-            </button>
-
-            {/* Editar (Solo si NO está cancelada ni completada) */}
-            {apt.status !== 'cancelled' && apt.status !== 'completed' && (
-                <button title="Editar" data-id={apt.id} data-action="edit" data-date={apt.appointment_date} data-time={apt.appointment_time} class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
-                </button>
-            )}
-
-            {/* ESTADO: PENDIENTE */}
-            {apt.status === "pending" && (
-                <>
-                <button title="Confirmar" data-id={apt.id} data-action="confirm" class="group h-8 px-3 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 pointer-events-none"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                </button>
-                <button title="Cancelar" data-id={apt.id} data-action="cancel" class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 pointer-events-none"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
-                </button>
-                </>
-            )}
-
-            {/* ESTADO: CONFIRMADA */}
-            {apt.status === "confirmed" && (
-                <>
-                <button title="Completar" data-id={apt.id} data-action="complete" class="group h-8 px-3 bg-blue-600 text-white border border-blue-700 rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 pointer-events-none"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
-                </button>
-                <button title="Cancelar" data-id={apt.id} data-action="cancel" class="group h-8 w-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 pointer-events-none"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" /></svg>
-                </button>
-                </>
-            )}
-
-            {/* ESTADO: COMPLETADA */}
-            {apt.status === "completed" && (
-                <>
-                <div class="h-8 px-3 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide cursor-default opacity-80">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                </div>
-                <button title="Deshacer" data-id={apt.id} data-action="undo_complete" class="group h-8 w-8 flex items-center justify-center bg-white text-gray-400 border border-gray-200 rounded-lg hover:bg-orange-50 hover:text-orange-500 hover:border-orange-200 transition-all shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 pointer-events-none"><path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 01-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 010 10.75H10.75a.75.75 0 010-1.5h2.875a3.875 3.875 0 000-7.75H3.622l4.146 3.957a.75.75 0 01-1.036 1.085l-5.5-5.25a.75.75 0 010-1.085l5.5-5.25a.75.75 0 011.06.025z" clip-rule="evenodd" /></svg>
-                </button>
-                </>
-            )}
-
-            {/* 🗑️ ESTADO: CANCELADA (CON BOTÓN DE ELIMINAR) */}
-            {apt.status === "cancelled" && (
-                <>
-                <button title="Restaurar" data-id={apt.id} data-action="restore" class="group h-8 px-3 bg-white text-gray-500 border border-gray-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide group/restore">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 group-hover/restore:-rotate-180 transition-transform duration-500 pointer-events-none"><path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 01-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 010 10.75H10.75a.75.75 0 010-1.5h2.875a3.875 3.875 0 000-7.75H3.622l4.146 3.957a.75.75 0 01-1.036 1.085l-5.5-5.25a.75.75 0 010-1.085l5.5-5.25a.75.75 0 011.06.025z" clip-rule="evenodd" /></svg>
-                    Restaurar
-                </button>
-                
-                {/* 🆕 BOTÓN ELIMINAR (SOLO PARA CANCELADAS) */}
-                <button title="Eliminar permanentemente" data-id={apt.id} data-action="delete" data-name={apt.customer_name} class="group h-8 w-8 flex items-center justify-center bg-white text-red-400 border border-red-200 rounded-lg hover:bg-red-600 hover:text-white hover:border-red-700 transition-all shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 pointer-events-none"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
-                </button>
-                </>
-            )}
-          </div></td>
-        </tr>
-        )
-    })
-  }
-</tbody>
+            <tbody class="divide-y divide-gray-50">
+              {recentActivity.map(apt => (
+                <tr class="hover:bg-gray-50/50 transition-colors">
+                  <td class="px-6 py-3 font-medium text-gray-900">{apt.customer_name}</td>
+                  <td class="px-6 py-3 text-gray-500">
+                    {new Date(apt.appointment_date + 'T00:00:00').toLocaleDateString('es-CO', {day: 'numeric', month: 'short'})} 
+                    <span class="text-xs ml-1 bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{apt.appointment_time.slice(0,5)}</span>
+                  </td>
+                  <td class="px-6 py-3">
+                    {apt.status === "pending" && <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pendiente</span>}
+                    {apt.status === "confirmed" && <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Confirmada</span>}
+                    {apt.status === "completed" && <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completada</span>}
+                    {apt.status === "cancelled" && <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Cancelada</span>}
+                  </td>
+                </tr>
+              ))}
+              {recentActivity.length === 0 && (
+                <tr><td colspan="3" class="px-6 py-8 text-center text-gray-400">No hay actividad reciente.</td></tr>
+              )}
+            </tbody>
           </table>
-          {(!appointments || appointments.length === 0) && (<div class="text-center py-20 bg-gray-50"><div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white border border-gray-100 shadow-sm mb-4"><span class="text-2xl">📅</span></div><h3 class="text-lg font-bold text-gray-900">Agenda Vacía</h3><p class="text-gray-500 max-w-sm mx-auto mt-1">No hay citas programadas con estos filtros.</p></div>)}
         </div>
-
-        <!-- 🎯 PAGINACIÓN (NUEVO) -->
-        <div id="pagination-container" class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <!-- Info de resultados -->
-          <div class="text-sm text-gray-600">
-            Mostrando <span id="page-info-start" class="font-bold text-gray-900">1</span> a 
-            <span id="page-info-end" class="font-bold text-gray-900">10</span> de 
-            <span id="page-info-total" class="font-bold text-gray-900">0</span> citas
-          </div>
-
-          <!-- Controles de paginación -->
-          <div class="flex items-center gap-2">
-            <button id="btn-first-page" class="h-9 w-9 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Primera página">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-600">
-                <path fill-rule="evenodd" d="M15.79 14.77a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L11.832 10l3.938 3.71a.75.75 0 01.02 1.06zm-6 0a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L5.832 10l3.938 3.71a.75.75 0 01.02 1.06z" clip-rule="evenodd" />
-              </svg>
-            </button>
-
-            <button id="btn-prev-page" class="h-9 px-4 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
-                <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-              </svg>
-              Anterior
-            </button>
-
-            <!-- Números de página -->
-            <div id="page-numbers" class="flex items-center gap-1">
-              <!-- Se genera dinámicamente -->
-            </div>
-
-            <button id="btn-next-page" class="h-9 px-4 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white">
-              Siguiente
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1">
-                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-              </svg>
-            </button>
-
-            <button id="btn-last-page" class="h-9 w-9 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Última página">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-600">
-                <path fill-rule="evenodd" d="M10.21 14.77a.75.75 0 01.02-1.06L14.168 10 10.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02zm-6 0a.75.75 0 01.02-1.06L8.168 10 4.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
       </div>
+
     </div>
+
   </div>
 </AdminLayout>
-
-<script>
-  import Swal from 'sweetalert2';
-  import { supabase } from "../../lib/supabase";
-
-  // ==========================================
-  // 1. AUTH CHECK
-  // ==========================================
-  async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      window.location.href = "/admin/login";
-    } else {
-      const content = document.getElementById("main-content");
-      if (content) content.classList.remove("hidden");
-    }
-  }
-  checkAuth();
-
-  // ==========================================
-  // 2. DATOS GLOBALES
-  // ==========================================
-  const appData = document.getElementById('app-data');
-  const servicesList = appData ? JSON.parse(appData.dataset.services || '[]') : [];
-  const dentistsList = appData ? JSON.parse(appData.dataset.dentists || '[]') : [];
-  const defaultBusinessId = appData?.dataset.businessId || "";
-
-  // Variables de Paginación
-  const ITEMS_PER_PAGE = 10;
-  let currentPage = 1;
-  let allFilteredRows = []; // Almacena las filas (elementos HTML) que pasan el filtro
-
-  // Referencias DOM (con Casting para evitar errores TS)
-  const filterDate = document.getElementById("filter-date") as HTMLSelectElement;
-  const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
-  const filterDentist = document.getElementById("filter-dentist") as HTMLSelectElement;
-  const searchInput = document.getElementById("search-input") as HTMLInputElement;
-  const clearBtn = document.getElementById("clear-filters");
-  const exportBtn = document.getElementById("export-excel");
-  
-  // Seleccionamos todas las filas una sola vez al inicio
-  const tableRows = Array.from(document.querySelectorAll(".search-item")) as HTMLElement[];
-
-  // ==========================================
-  // 3. MOTOR DE FILTRADO
-  // ==========================================
-  function applyFilters() {
-    const dateVal = filterDate.value || "all";
-    const statusVal = filterStatus.value || "all";
-    const dentistVal = filterDentist.value || "all";
-    const searchVal = searchInput.value.toLowerCase().trim() || "";
-    
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    // Reiniciar lista
-    allFilteredRows = [];
-
-    tableRows.forEach((row) => {
-      // Por defecto asumimos que pasa, si falla alguna condición la marcamos y ocultamos
-      let passes = true;
-
-      // 1. Estado
-      if (statusVal !== "all" && row.dataset.status !== statusVal) passes = false;
-
-      // 2. Dentista
-      if (passes && dentistVal !== "all") {
-        const rowDentistId = row.dataset.dentistId;
-        if (dentistVal === "unassigned") {
-            if (rowDentistId !== "null") passes = false;
-        } else {
-            if (rowDentistId !== dentistVal) passes = false;
-        }
-      }
-
-      // 3. Fecha
-      if (passes && dateVal !== "all") {
-        const rowDateStr = row.dataset.date || "";
-        const rowDate = new Date(rowDateStr + 'T00:00:00'); 
-        
-        if (dateVal === "today") {
-            if (rowDate.getTime() !== today.getTime()) passes = false;
-        } else if (dateVal === "week") {
-            const first = today.getDate() - today.getDay() + 1;
-            const last = first + 6;
-            const monday = new Date(today); monday.setDate(first); monday.setHours(0,0,0,0);
-            const sunday = new Date(today); sunday.setDate(last); sunday.setHours(23,59,59,999);
-            if (rowDate < monday || rowDate > sunday) passes = false;
-        } else if (dateVal === "month") {
-            if (rowDate.getMonth() !== today.getMonth() || rowDate.getFullYear() !== today.getFullYear()) passes = false;
-        }
-      }
-
-      // 4. Búsqueda
-      if (passes && searchVal) {
-        const searchText = row.dataset.search?.toLowerCase() || "";
-        if (!searchText.includes(searchVal)) passes = false;
-      }
-
-      // LÓGICA FINAL
-      if (passes) {
-        allFilteredRows.push(row);
-      } else {
-        row.style.display = "none"; // Ocultar inmediatamente si no pasa
-      }
-    });
-
-    // Reiniciar paginación
-    currentPage = 1;
-    updatePagination();
-  }
-
-  // ==========================================
-  // 4. MOTOR DE PAGINACIÓN
-  // ==========================================
-  function updatePagination() {
-    const totalItems = allFilteredRows.length;
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-
-    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-
-    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIdx = startIdx + ITEMS_PER_PAGE;
-
-    // 1. Ocultar todos los filtrados primero
-    allFilteredRows.forEach(row => row.style.display = 'none');
-    
-    // 2. Mostrar solo el rango actual
-    allFilteredRows.slice(startIdx, endIdx).forEach(row => row.style.display = 'table-row');
-
-    // Info Text
-    const infoStart = document.getElementById('page-info-start');
-    const infoEnd = document.getElementById('page-info-end');
-    const infoTotal = document.getElementById('page-info-total');
-
-    if (infoStart) infoStart.textContent = totalItems > 0 ? (startIdx + 1).toString() : '0';
-    if (infoEnd) infoEnd.textContent = Math.min(endIdx, totalItems).toString();
-    if (infoTotal) infoTotal.textContent = totalItems.toString();
-
-    // Botones
-    const btnFirst = document.getElementById('btn-first-page') as HTMLButtonElement;
-    const btnPrev = document.getElementById('btn-prev-page') as HTMLButtonElement;
-    const btnNext = document.getElementById('btn-next-page') as HTMLButtonElement;
-    const btnLast = document.getElementById('btn-last-page') as HTMLButtonElement;
-
-    if (btnFirst) btnFirst.disabled = currentPage === 1;
-    if (btnPrev) btnPrev.disabled = currentPage === 1;
-    if (btnNext) btnNext.disabled = currentPage === totalPages || totalPages === 0;
-    if (btnLast) btnLast.disabled = currentPage === totalPages || totalPages === 0;
-
-    renderPageNumbers(totalPages);
-
-    const container = document.getElementById('pagination-container');
-    if (container) container.style.display = totalItems > 0 ? 'flex' : 'none';
-  }
-
-  function renderPageNumbers(totalPages: number) {
-    const container = document.getElementById('page-numbers');
-    if (!container) return;
-    container.innerHTML = '';
-
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, currentPage + 2);
-
-    if (currentPage <= 3) endPage = Math.min(5, totalPages);
-    if (currentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
-
-    const createBtn = (num: number) => {
-        const btn = document.createElement('button');
-        btn.textContent = String(num);
-        btn.className = num === currentPage
-            ? 'h-9 w-9 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-sm'
-            : 'h-9 w-9 flex items-center justify-center bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-all';
-        btn.onclick = () => { currentPage = num; updatePagination(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-        return btn;
-    };
-
-    if (startPage > 1) {
-        container.appendChild(createBtn(1));
-        if (startPage > 2) container.appendChild(document.createTextNode('...'));
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-        container.appendChild(createBtn(i));
-    }
-
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) container.appendChild(document.createTextNode('...'));
-        container.appendChild(createBtn(totalPages));
-    }
-  }
-
-  // ==========================================
-  // 5. EVENTOS DE FILTRO
-  // ==========================================
-  filterDate?.addEventListener("change", applyFilters);
-  filterStatus?.addEventListener("change", applyFilters);
-  filterDentist?.addEventListener("change", applyFilters);
-  searchInput?.addEventListener("input", applyFilters);
-  
-  clearBtn?.addEventListener("click", () => {
-    filterDate.value = "all";
-    filterStatus.value = "all";
-    filterDentist.value = "all";
-    searchInput.value = "";
-    applyFilters();
-  });
-
-  // Listeners Paginación
-  document.getElementById('btn-first-page')?.addEventListener('click', () => { currentPage = 1; updatePagination(); });
-  document.getElementById('btn-prev-page')?.addEventListener('click', () => { if(currentPage > 1) currentPage--; updatePagination(); });
-  document.getElementById('btn-next-page')?.addEventListener('click', () => { if(currentPage < Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE)) currentPage++; updatePagination(); });
-  document.getElementById('btn-last-page')?.addEventListener('click', () => { currentPage = Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE); updatePagination(); });
-
-  // ==========================================
-  // 6. EXPORTAR EXCEL
-  // ==========================================
-  exportBtn?.addEventListener("click", () => {
-    const statusTranslate: any = { 'pending': 'Pendiente', 'confirmed': 'Confirmada', 'completed': 'Completada', 'cancelled': 'Cancelada' };
-    let csv = "Fecha;Hora;Paciente;Documento;Edad;Telefono;Email;Servicio;Dentista;Estado;Origen;Motivo\n";
-    
-    allFilteredRows.forEach(row => {
-        const ds = row.dataset;
-        const line = [
-            ds.date, ds.time, (ds.name || "").replace(/"/g, '""'), ds.doc, ds.age, ds.phone, ds.email,
-            ds.service, ds.dentistName, statusTranslate[ds.status || ""] || ds.status, ds.source, (ds.reason || "").replace(/"/g, '')
-        ];
-        csv += line.map(field => `"${field || ''}"`).join(';') + "\n";
-    });
-
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `reporte_citas_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  });
-
-  // ==========================================
-  // 7. NUEVA CITA
-  // ==========================================
-  document.getElementById('new-appointment-btn')?.addEventListener('click', async () => {
-    const serviceOptions = servicesList.map((s: any) => `<option value="${s.id}">${s.name}</option>`).join('');
-    const dentistOptions = dentistsList.map((d: any) => `<option value="${d.id}">${d.name}</option>`).join('');
-
-    const { value: formValues } = await Swal.fire({
-        title: '<h2 class="text-2xl font-bold text-gray-800">Nueva Cita</h2>',
-        html: `
-            <div class="flex flex-col gap-4 text-left p-2">
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Paciente</label><input id="new-name" autocomplete="off" placeholder="Nombre completo" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label><input id="new-phone" autocomplete="off" placeholder="Ej: 3001234567" type="tel" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label><input id="new-email" type="email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                     <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Documento</label><input id="new-document" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                </div>
-                 <div class="grid grid-cols-3 gap-3">
-                    <div class="col-span-1"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Edad</label><input id="new-age" type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                    <div class="col-span-2"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fuente</label><select id="new-source" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="presencial">Presencial / Walk-in</option><option value="telefono">Llamada Telefónica</option><option value="google">Google</option><option value="referido">Referido</option></select></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Servicio</label><select id="new-service" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="">Selecciona...</option>${serviceOptions}</select></div>
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dentista</label><select id="new-dentist" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"><option value="">Cualquiera...</option>${dentistOptions}</select></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label><input id="new-date" type="date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                    <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label><input id="new-time" type="time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></div>
-                </div>
-                <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Motivo</label><textarea id="new-reason" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"></textarea></div>
-            </div>
-        `,
-        width: '600px',
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: 'Crear Cita',
-        preConfirm: () => {
-            const name = (document.getElementById('new-name') as HTMLInputElement).value;
-            const phone = (document.getElementById('new-phone') as HTMLInputElement).value;
-            const date = (document.getElementById('new-date') as HTMLInputElement).value;
-            const time = (document.getElementById('new-time') as HTMLInputElement).value;
-            const service = (document.getElementById('new-service') as HTMLSelectElement).value;
-            
-            if (!name || !phone || !date || !time || !service) {
-                Swal.showValidationMessage('Campos obligatorios faltantes');
-                return false;
-            }
-            return { 
-                name, phone, date, time, service,
-                email: (document.getElementById('new-email') as HTMLInputElement).value,
-                documentId: (document.getElementById('new-document') as HTMLInputElement).value,
-                age: (document.getElementById('new-age') as HTMLInputElement).value,
-                source: (document.getElementById('new-source') as HTMLSelectElement).value,
-                dentist: (document.getElementById('new-dentist') as HTMLSelectElement).value,
-                reason: (document.getElementById('new-reason') as HTMLTextAreaElement).value
-            };
-        }
-    });
-
-    if (formValues) {
-        Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
-
-        const { error } = await supabase.from('appointments').insert({
-            business_id: defaultBusinessId,
-            service_id: formValues.service,
-            dentist_id: formValues.dentist || null,
-            customer_name: formValues.name,
-            customer_email: formValues.email,
-            customer_phone: formValues.phone,
-            appointment_date: formValues.date,
-            appointment_time: formValues.time,
-            status: 'confirmed',
-            patient_age: formValues.age ? parseInt(formValues.age) : null,
-            patient_doc: formValues.documentId,
-            consultation_reason: formValues.reason,
-            marketing_source: formValues.source,
-            is_first_visit: false
-        });
-
-        if (error) Swal.fire('Error', error.message, 'error');
-        else { await Swal.fire({ icon: 'success', title: '¡Cita Creada!', timer: 2000, showConfirmButton: false }); window.location.reload(); }
-    }
-  });
-
-  // ==========================================
-  // 8. ACCIONES (Editar, Cancelar, Eliminar)
-  // ==========================================
-  document.addEventListener("click", async (e) => {
-    // @ts-ignore
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-
-    const { id, action } = btn.dataset;
-    const ds = btn.dataset;
-
-    if (action === 'view_details') {
-        Swal.fire({
-            title: `📋 Ficha de ${ds.name || "Paciente"}`,
-            html: `
-                <div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
-                    <p><strong>Edad:</strong> ${ds.age || 'N/A'} años</p>
-                    <p><strong>Documento:</strong> ${ds.doc || 'N/A'}</p>
-                    <p><strong>Atendido por:</strong> ${ds.dentist || 'No asignado'}</p>
-                    <p><strong>Motivo:</strong> ${ds.reason || 'Sin especificar'}</p>
-                    <p><strong>Origen:</strong> ${ds.source || 'Desconocido'}</p>
-                </div>`,
-            confirmButtonText: 'Cerrar'
-        });
-        return; 
-    }
-
-    if (action === 'edit') {
-        const { value: formValues } = await Swal.fire({
-            title: 'Reprogramar Cita',
-            html: `
-                <div class="flex flex-col gap-4 text-left">
-                    <div><label class="block text-sm">Nueva Fecha</label><input id="swal-date" type="date" class="w-full px-3 py-2 border rounded" value="${ds.date}"></div>
-                    <div><label class="block text-sm">Nueva Hora</label><input id="swal-time" type="time" class="w-full px-3 py-2 border rounded" value="${ds.time}"></div>
-                </div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Guardar',
-            preConfirm: () => [
-                (document.getElementById('swal-date') as HTMLInputElement).value, 
-                (document.getElementById('swal-time') as HTMLInputElement).value
-            ]
-        });
-
-        if (formValues) {
-            const [newDate, newTime] = formValues;
-            if (!newDate || !newTime) return;
-            Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
-            const { error } = await supabase.from("appointments").update({ appointment_date: newDate, appointment_time: newTime }).eq("id", id);
-            if (error) Swal.fire('Error', error.message, 'error');
-            else { await Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-        }
-        return; 
-    }
-
-    // 🗑️ MANEJO ESPECIAL PARA ELIMINACIÓN PERMANENTE
-    if (action === 'delete') {
-        const patientName = ds.name || "esta cita";
-        
-        const result = await Swal.fire({
-            title: '⚠️ ELIMINAR PERMANENTEMENTE',
-            html: `
-                <div class="text-left space-y-3">
-                    <p class="text-gray-700">Estás a punto de eliminar la cita de:</p>
-                    <p class="font-bold text-lg text-gray-900">${patientName}</p>
-                    <div class="bg-red-50 border-l-4 border-red-600 p-3 rounded">
-                        <p class="text-sm font-bold text-red-800">⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER</p>
-                        <p class="text-xs text-red-700 mt-1">El registro será eliminado permanentemente de la base de datos.</p>
-                    </div>
-                </div>
-            `,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#DC2626',
-            cancelButtonColor: '#6B7280',
-            confirmButtonText: '🗑️ Sí, eliminar permanentemente',
-            cancelButtonText: 'Cancelar',
-            focusCancel: true,
-            customClass: {
-                confirmButton: 'font-bold',
-                cancelButton: 'font-bold'
-            }
-        });
-
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Eliminando...', didOpen: () => Swal.showLoading() });
-            
-            const { error } = await supabase
-                .from("appointments")
-                .delete()
-                .eq("id", id);
-            
-            if (error) {
-                Swal.fire('Error', error.message, 'error');
-            } else {
-                await Swal.fire({ 
-                    icon: 'success', 
-                    title: '¡Eliminada!', 
-                    text: 'La cita ha sido eliminada permanentemente.',
-                    timer: 2000, 
-                    showConfirmButton: false 
-                });
-                window.location.reload();
-            }
-        }
-        return; // Salir después de manejar delete
-    }
-
-    // Configuración de Acciones Genéricas
-    const configs: any = {
-        confirm: { title: '¿Confirmar Cita?', text: "El paciente será notificado.", icon: 'question', confirmBtnText: 'Sí, confirmar', confirmBtnColor: '#10B981' },
-        cancel: { title: '¿Cancelar Cita?', text: "Podrás restaurarla después.", icon: 'warning', confirmBtnText: 'Sí, cancelar', confirmBtnColor: '#EF4444' },
-        complete: { title: '¿Finalizar Servicio?', text: "Se marcará como completado.", icon: 'success', confirmBtnText: 'Sí, finalizar', confirmBtnColor: '#3B82F6' },
-        restore: { title: '¿Restaurar Cita?', text: "Volverá al estado Pendiente.", icon: 'info', confirmBtnText: 'Restaurar', confirmBtnColor: '#10B981' },
-        undo_complete: { title: '¿Deshacer?', text: "Volverá al estado Confirmada.", icon: 'question', confirmBtnText: 'Sí, deshacer', confirmBtnColor: '#F59E0B' }
-    };
-
-    const config = configs[action];
-    const result = await Swal.fire({
-        title: config.title, text: config.text, icon: config.icon,
-        showCancelButton: true, confirmButtonColor: config.confirmBtnColor, confirmButtonText: config.confirmBtnText
-    });
-
-    if (result.isConfirmed) {
-        Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
-        
-        const statusMap: any = { confirm: "confirmed", cancel: "cancelled", complete: "completed", restore: "pending", undo_complete: "confirmed" };
-        const { error: upErr } = await supabase.from("appointments").update({ status: statusMap[action] }).eq("id", id);
-        
-        if (upErr) Swal.fire('Error', upErr.message, 'error');
-        else { await Swal.fire({ icon: 'success', title: '¡Listo!', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-    }
-  });
-
-  // Logout
-  document.getElementById("logout-btn")?.addEventListener("click", async () => {
-    const result = await Swal.fire({ title: '¿Cerrar sesión?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, salir' });
-    if (result.isConfirmed) {
-        await supabase.auth.signOut();
-        document.cookie = "sb-access-token=; path=/; max-age=0";
-        document.cookie = "sb-refresh-token=; path=/; max-age=0";
-        window.location.href = "/admin/login";
-    }
-  });
-
-  // Inicializar
-  setTimeout(() => {
-    applyFilters();
-  }, 100);
-
-</script>
