@@ -4,18 +4,26 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Tu paleta primary original (se mantiene por seguridad)
         primary: {
           50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
+          // ... (tus otros colores) ...
           900: '#1e3a8a',
         },
+        // 🔥 LA NUEVA PALETA DINÁMICA (Aquí ocurre la magia)
+        brand: {
+          DEFAULT: 'rgb(var(--color-brand) / <alpha-value>)',
+          50: 'rgb(var(--color-brand) / 0.05)',  // Fondo muy suave
+          100: 'rgb(var(--color-brand) / 0.1)',  // Fondo suave
+          200: 'rgb(var(--color-brand) / 0.2)',  // Bordes suaves
+          300: 'rgb(var(--color-brand) / 0.3)',
+          400: 'rgb(var(--color-brand) / 0.6)',
+          500: 'rgb(var(--color-brand) / 0.8)',
+          600: 'rgb(var(--color-brand) / 1)',    // COLOR PRINCIPAL (Botones)
+          700: 'rgb(var(--color-brand) / 0.9)',  // Hover
+          800: 'rgb(var(--color-brand) / 0.95)', // Active
+          900: 'rgb(var(--color-brand) / 1)',
+        }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

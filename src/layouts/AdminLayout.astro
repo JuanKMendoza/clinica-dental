@@ -9,21 +9,63 @@ interface Props {
 const { title } = Astro.props;
 const currentPath = Astro.url.pathname;
 
+// 1. VALORES POR DEFECTO (Seguridad ante fallos)
+let brandColorHex = "#2563EB"; // Azul DentalApp (Fallback)
+let brandLogoUrl = null;
+let businessName = "DentalApp";
+
+// 2. FUNCIÓN MAESTRA: HEX -> RGB
+// Convierte "#E11D48" a "225 29 72" para que Tailwind pueda usar opacidades
+const hexToRgb = (hex: string) => {
+  const cleanHex = hex.replace('#', '').trim();
+  if (cleanHex.length !== 6) return "37 99 235"; // Retorna azul si el hex es inválido
+  
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  
+  return `${r} ${g} ${b}`;
+}
+
+// 3. OBTENER DATOS (SSR)
+const accessToken = Astro.cookies.get("sb-access-token")?.value;
+const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
+
+if (accessToken && refreshToken) {
+  // Configurar sesión temporalmente para leer la BD
+  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  
+  // Buscar configuración del negocio
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("primary_color, logo_url, name")
+    .single(); // .single() es más eficiente si esperas 1 resultado
+
+  if (business) {
+    if (business.primary_color) brandColorHex = business.primary_color;
+    if (business.logo_url) brandLogoUrl = business.logo_url;
+    if (business.name) businessName = business.name;
+  }
+}
+
+// Convertimos el color final a RGB
+const brandRgb = hexToRgb(brandColorHex);
+
+// 4. MENÚ (Usando clases 'brand' en lugar de 'blue')
 const menuItems = [
   { 
     label: "Dashboard", 
     href: "/admin/dashboard", 
-    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />` 
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />` 
   },
   { 
     label: "Citas", 
-    href: "/admin/citas", // Preparado para la separación
+    href: "/admin/citas", 
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />` 
   },
   { 
     label: "Configuración", 
     href: "/admin/configuracion", 
-    // Icono Premium: Engranaje Geométrico Limpio
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />` 
   }
 ];
@@ -31,8 +73,9 @@ const menuItems = [
 const getLinkClass = (path: string) => {
   const isActive = currentPath === path || (path !== '/admin/dashboard' && currentPath.startsWith(path));
   return {
-    desktop: isActive ? "bg-blue-50 text-blue-700 font-semibold border-r-4 border-blue-600" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900",
-    mobile: isActive ? "text-blue-600" : "text-gray-400 hover:text-gray-600",
+    // CAMBIO CLAVE: Usar 'bg-brand-50' y 'text-brand-600' en lugar de blue
+    desktop: isActive ? "bg-brand-50 text-brand-600 font-semibold border-r-4 border-brand-600" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900",
+    mobile: isActive ? "text-brand-600" : "text-gray-400 hover:text-gray-600",
     isActive
   };
 };
@@ -43,27 +86,39 @@ const getLinkClass = (path: string) => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title} | Admin Panel</title>
+    <title>{title} | {businessName}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
-  <body class="bg-gray-50/50 font-sans antialiased text-gray-900 h-[100dvh] flex flex-col md:flex-row overflow-hidden">
+  
+  <!-- 🔥 INYECCIÓN DE COLOR EN EL BODY: Esto garantiza que la variable exista globalmente -->
+  <body 
+    class="bg-gray-50/50 font-sans antialiased text-gray-900 h-[100dvh] flex flex-col md:flex-row overflow-hidden"
+    style={`--color-brand: ${brandRgb};`}
+  >
     
     <!-- SIDEBAR (DESKTOP) -->
     <aside class="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col h-full shadow-sm z-20">
       <div class="h-20 flex items-center px-8 border-b border-gray-50">
         <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity" title="Ir al sitio web">
-          <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200">D</div>
-          <span class="font-bold text-xl text-gray-800 tracking-tight">Dental<span class="text-blue-600">App</span></span>
+          {brandLogoUrl ? (
+            <img src={brandLogoUrl} alt="Logo" class="w-8 h-8 object-contain rounded-md" />
+          ) : (
+            // Logo fallback con color de marca
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-200 bg-brand-600">
+              {businessName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span class="font-bold text-xl text-gray-800 tracking-tight truncate max-w-[140px]">{businessName}</span>
         </a>
       </div>
 
       <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <p class="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Principal</p>
+        <p class="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Menú</p>
         {menuItems.map((item) => {
           const styles = getLinkClass(item.href);
           return (
             <a href={item.href} class={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${styles.desktop}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class={`w-5 h-5 transition-transform group-hover:scale-110 ${styles.isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} set:html={item.icon} />
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class={`w-5 h-5 transition-transform group-hover:scale-110 ${styles.isActive ? 'text-brand-600' : 'text-gray-400 group-hover:text-gray-600'}`} set:html={item.icon} />
               <span>{item.label}</span>
             </a>
           )
@@ -88,8 +143,14 @@ const getLinkClass = (path: string) => {
       <!-- Top Header Mobile -->
       <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-gray-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
         <a href="/" class="flex items-center gap-2">
-          <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">D</div>
-          <span class="font-bold text-lg text-gray-900">Dental<span class="text-blue-600">App</span></span>
+           {brandLogoUrl ? (
+            <img src={brandLogoUrl} alt="Logo" class="w-8 h-8 object-contain rounded-md" />
+          ) : (
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold bg-brand-600">
+              {businessName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span class="font-bold text-lg text-gray-900 truncate max-w-[200px]">{businessName}</span>
         </a>
         <button id="logout-btn-mobile" class="text-gray-400 hover:text-red-500 p-2">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
@@ -97,7 +158,6 @@ const getLinkClass = (path: string) => {
       </header>
 
       <!-- Scrollable Area -->
-      <!-- Corrección: pb-28 para que la barra inferior no tape nada -->
       <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 pb-28 md:pb-8 w-full">
         <slot />
       </div>
@@ -113,7 +173,7 @@ const getLinkClass = (path: string) => {
               <svg xmlns="http://www.w3.org/2000/svg" fill={styles.isActive ? "currentColor" : "none"} viewBox="0 0 24 24" stroke-width={styles.isActive ? "0" : "2"} stroke="currentColor" class="w-full h-full" set:html={item.icon} />
             </div>
             <span class={`text-[10px] font-medium ${styles.isActive ? 'font-bold' : ''}`}>{item.label}</span>
-            {styles.isActive && <div class="w-1 h-1 bg-blue-600 rounded-full mt-0.5"></div>}
+            {styles.isActive && <div class="w-1 h-1 rounded-full mt-0.5 bg-brand-600"></div>}
           </a>
         )
       })}
