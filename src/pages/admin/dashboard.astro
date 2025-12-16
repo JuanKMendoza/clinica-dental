@@ -93,7 +93,7 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
         </div>
       </div>
 
-      <!-- FILTROS (ACTUALIZADO) -->
+      <!-- FILTROS -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
             <div class="md:col-span-3">
@@ -115,12 +115,11 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
                     <option value="cancelled">🚫 Canceladas</option>
                 </select>
             </div>
-            <!-- FILTRO DENTISTA ACTUALIZADO -->
             <div class="md:col-span-3">
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Profesional</label>
                 <select id="filter-dentist" class="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
                     <option value="all">👨‍⚕️ Todos</option>
-                    <option value="unassigned">⚠️ Sin Asignar</option> <!-- NUEVA OPCIÓN -->
+                    <option value="unassigned">⚠️ Sin Asignar</option>
                     {dentistsList && dentistsList.map(d => <option value={d.id}>{d.name}</option>)}
                 </select>
             </div>
@@ -151,7 +150,7 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
                 <th class="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-50">
+            <tbody id="appointments-tbody" class="divide-y divide-gray-50">
               {
                 appointments && appointments.map((apt) => {
                     const dateObj = new Date(apt.appointment_date + 'T00:00:00');
@@ -183,7 +182,6 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
                       <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="flex flex-col items-center justify-center w-12 h-12 bg-gray-100 rounded-lg border border-gray-200"><span class="text-[10px] uppercase font-bold text-gray-500 leading-none">{monthName}</span><span class="text-lg font-bold text-gray-900 leading-none mt-0.5">{dayNum}</span></div><div class="flex flex-col"><span class="text-sm font-medium text-gray-900 capitalize">{dayName}</span><span class="text-sm text-gray-500 font-mono bg-gray-100 px-1.5 rounded text-center">{apt.appointment_time.slice(0, 5)}</span></div></div></td>
                       <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-sm">{getInitials(apt.customer_name)}</div><div class="text-sm font-semibold text-gray-900">{apt.customer_name}</div></div></td>
                       
-                      <!-- DENTISTA -->
                       <td class="px-6 py-4">
                         {apt.dentists?.name ? (
                             <div class="flex items-center gap-2"><span class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs">👨‍⚕️</span><span class="text-sm text-gray-700 font-medium">{apt.dentists.name}</span></div>
@@ -211,6 +209,51 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
           </table>
           {(!appointments || appointments.length === 0) && (<div class="text-center py-20 bg-gray-50"><div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white border border-gray-100 shadow-sm mb-4"><span class="text-2xl">📅</span></div><h3 class="text-lg font-bold text-gray-900">Agenda Vacía</h3><p class="text-gray-500 max-w-sm mx-auto mt-1">No hay citas programadas con estos filtros.</p></div>)}
         </div>
+
+        <!-- 🎯 PAGINACIÓN (NUEVO) -->
+        <div id="pagination-container" class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+          <!-- Info de resultados -->
+          <div class="text-sm text-gray-600">
+            Mostrando <span id="page-info-start" class="font-bold text-gray-900">1</span> a 
+            <span id="page-info-end" class="font-bold text-gray-900">10</span> de 
+            <span id="page-info-total" class="font-bold text-gray-900">0</span> citas
+          </div>
+
+          <!-- Controles de paginación -->
+          <div class="flex items-center gap-2">
+            <button id="btn-first-page" class="h-9 w-9 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Primera página">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-600">
+                <path fill-rule="evenodd" d="M15.79 14.77a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L11.832 10l3.938 3.71a.75.75 0 01.02 1.06zm-6 0a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L5.832 10l3.938 3.71a.75.75 0 01.02 1.06z" clip-rule="evenodd" />
+              </svg>
+            </button>
+
+            <button id="btn-prev-page" class="h-9 px-4 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+              </svg>
+              Anterior
+            </button>
+
+            <!-- Números de página -->
+            <div id="page-numbers" class="flex items-center gap-1">
+              <!-- Se genera dinámicamente -->
+            </div>
+
+            <button id="btn-next-page" class="h-9 px-4 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white">
+              Siguiente
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1">
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+              </svg>
+            </button>
+
+            <button id="btn-last-page" class="h-9 w-9 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Última página">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-600">
+                <path fill-rule="evenodd" d="M10.21 14.77a.75.75 0 01.02-1.06L14.168 10 10.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02zm-6 0a.75.75 0 01.02-1.06L8.168 10 4.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -232,13 +275,163 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
   }
   checkAuth();
 
-  // 2. RECUPERAR DATOS DE SERVICIOS Y DENTISTAS
+  // 2. RECUPERAR DATOS
   const appData = document.getElementById('app-data');
   const servicesList = appData ? JSON.parse(appData.dataset.services || '[]') : [];
   const dentistsList = appData ? JSON.parse(appData.dataset.dentists || '[]') : [];
   const defaultBusinessId = appData?.dataset.businessId || "";
 
-  // 3. NUEVA CITA
+  // 🎯 3. SISTEMA DE PAGINACIÓN (CORREGIDO)
+  const ITEMS_PER_PAGE = 10;
+  let currentPage = 1;
+  let allFilteredRows: HTMLElement[] = []; // ✅ NUEVA: Lista completa de filas filtradas
+
+  function updatePagination() {
+    // ✅ CORRECCIÓN: Usar la lista guardada, no buscar en el DOM
+    const totalItems = allFilteredRows.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+    // Ajustar página actual si es necesario
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIdx = startIdx + ITEMS_PER_PAGE;
+
+    // Ocultar TODAS las filas filtradas primero
+    allFilteredRows.forEach(row => {
+      row.style.display = 'none';
+    });
+
+    // Mostrar solo las de la página actual
+    allFilteredRows.slice(startIdx, endIdx).forEach(row => {
+      row.style.display = 'table-row';
+    });
+
+    // Actualizar info de resultados
+    const infoStart = document.getElementById('page-info-start');
+    const infoEnd = document.getElementById('page-info-end');
+    const infoTotal = document.getElementById('page-info-total');
+
+    if (infoStart && infoEnd && infoTotal) {
+      infoStart.textContent = totalItems > 0 ? String(startIdx + 1) : '0';
+      infoEnd.textContent = String(Math.min(endIdx, totalItems));
+      infoTotal.textContent = String(totalItems);
+    }
+
+    // Actualizar botones de navegación
+    const btnFirst = document.getElementById('btn-first-page') as HTMLButtonElement;
+    const btnPrev = document.getElementById('btn-prev-page') as HTMLButtonElement;
+    const btnNext = document.getElementById('btn-next-page') as HTMLButtonElement;
+    const btnLast = document.getElementById('btn-last-page') as HTMLButtonElement;
+
+    if (btnFirst) btnFirst.disabled = currentPage === 1;
+    if (btnPrev) btnPrev.disabled = currentPage === 1;
+    if (btnNext) btnNext.disabled = currentPage === totalPages || totalPages === 0;
+    if (btnLast) btnLast.disabled = currentPage === totalPages || totalPages === 0;
+
+    // Generar números de página
+    renderPageNumbers(totalPages);
+
+    // Ocultar paginación si no hay resultados
+    const paginationContainer = document.getElementById('pagination-container');
+    if (paginationContainer) {
+      paginationContainer.style.display = totalItems > 0 ? 'flex' : 'none';
+    }
+  }
+
+  function renderPageNumbers(totalPages: number) {
+    const container = document.getElementById('page-numbers');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    if (currentPage <= 3) {
+      endPage = Math.min(5, totalPages);
+    }
+    if (currentPage >= totalPages - 2) {
+      startPage = Math.max(1, totalPages - 4);
+    }
+
+    if (startPage > 1) {
+      const btn = createPageButton(1);
+      container.appendChild(btn);
+      if (startPage > 2) {
+        const dots = document.createElement('span');
+        dots.className = 'px-2 text-gray-400';
+        dots.textContent = '...';
+        container.appendChild(dots);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      const btn = createPageButton(i);
+      container.appendChild(btn);
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        const dots = document.createElement('span');
+        dots.className = 'px-2 text-gray-400';
+        dots.textContent = '...';
+        container.appendChild(dots);
+      }
+      const btn = createPageButton(totalPages);
+      container.appendChild(btn);
+    }
+  }
+
+  function createPageButton(pageNum: number): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.textContent = String(pageNum);
+    btn.className = pageNum === currentPage
+      ? 'h-9 w-9 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-sm'
+      : 'h-9 w-9 flex items-center justify-center bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all';
+    
+    btn.addEventListener('click', () => {
+      currentPage = pageNum;
+      updatePagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    return btn;
+  }
+
+  // Event listeners de navegación
+  document.getElementById('btn-first-page')?.addEventListener('click', () => {
+    currentPage = 1;
+    updatePagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      updatePagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  document.getElementById('btn-next-page')?.addEventListener('click', () => {
+    const totalPages = Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE);
+    if (currentPage < totalPages) {
+      currentPage++;
+      updatePagination();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  document.getElementById('btn-last-page')?.addEventListener('click', () => {
+    const totalPages = Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE);
+    currentPage = totalPages;
+    updatePagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // 4. NUEVA CITA
   document.getElementById('new-appointment-btn')?.addEventListener('click', async () => {
     
     const serviceOptions = servicesList.map((s: any) => `<option value="${s.id}">${s.name}</option>`).join('');
@@ -333,7 +526,7 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
     }
   });
 
-  // 4. FILTROS Y BÚSQUEDA
+  // 5. FILTROS Y BÚSQUEDA (✅ CORREGIDO)
   const filterDate = document.getElementById("filter-date") as HTMLSelectElement;
   const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
   const filterDentist = document.getElementById("filter-dentist") as HTMLSelectElement;
@@ -350,28 +543,26 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
     const today = new Date();
     today.setHours(0,0,0,0);
 
+    // ✅ CORRECCIÓN: Guardar las filas filtradas en la lista global
+    allFilteredRows = [];
+
     tableRows.forEach((row) => {
       const rowEl = row as HTMLElement;
       let show = true;
 
-      // Filtro Estado
       if (statusVal !== "all") {
         if (rowEl.dataset.status !== statusVal) show = false;
       }
 
-      // === FILTRO DENTISTA CORREGIDO ===
       if (dentistVal !== "all") {
         const rowDentistId = rowEl.dataset.dentistId;
         if (dentistVal === "unassigned") {
-            // Mostrar solo si es "null"
             if (rowDentistId !== "null") show = false;
         } else {
-            // Mostrar solo si coincide el ID exacto
             if (rowDentistId !== dentistVal) show = false;
         }
       }
 
-      // Filtro Fecha
       if (dateVal !== "all") {
         const rowDateStr = rowEl.dataset.date || "";
         const rowDate = new Date(rowDateStr + 'T00:00:00'); 
@@ -389,21 +580,20 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
         }
       }
 
-      // Filtro Búsqueda
       if (searchVal) {
         const searchText = rowEl.dataset.search?.toLowerCase() || "";
         if (!searchText.includes(searchVal)) show = false;
       }
 
-      // Mostrar/Ocultar
+      // ✅ Agregar a la lista de filtradas si pasa los filtros
       if (show) {
-          // Si estamos en PC (md), usa table-row, si no, usa el valor por defecto (que será block/flex según el CSS)
-          // La forma más segura es quitar el 'display: none' dejando vacío, para que el CSS decida.
-          rowEl.style.display = ""; 
-      } else {
-          rowEl.style.display = "none";
+        allFilteredRows.push(rowEl);
       }
     });
+
+    // Resetear a página 1 y actualizar paginación
+    currentPage = 1;
+    updatePagination();
   }
 
   filterDate?.addEventListener("change", applyFilters);
@@ -419,11 +609,8 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
     applyFilters();
   });
 
-  // 5. EXPORTAR EXCEL
+  // 6. EXPORTAR EXCEL
   exportBtn?.addEventListener("click", () => {
-    const visibleRows = Array.from(document.querySelectorAll('tbody tr'))
-        .filter(row => (row as HTMLElement).style.display !== 'none');
-    
     const statusTranslate: {[key: string]: string} = {
         'pending': 'Pendiente',
         'confirmed': 'Confirmada',
@@ -433,9 +620,9 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
 
     let csv = "Fecha;Hora;Paciente;Documento;Edad;Telefono;Email;Servicio;Dentista;Estado;Origen;Motivo\n";
     
-    visibleRows.forEach(row => {
-        const el = row as HTMLElement;
-        const ds = el.dataset;
+    // ✅ CORRECCIÓN: Exportar desde allFilteredRows
+    allFilteredRows.forEach(row => {
+        const ds = row.dataset;
 
         const date = ds.date || "";
         const time = ds.time || "";
@@ -463,7 +650,7 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
     window.URL.revokeObjectURL(url);
   });
 
-  // 6. ACCIONES Y EDICIÓN
+  // 7. ACCIONES Y EDICIÓN
   document.addEventListener("click", async (e) => {
     // @ts-ignore
     const btn = e.target.closest('button[data-action]');
@@ -559,7 +746,7 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
     }
   });
 
-  // 7. LOGOUT
+  // 8. LOGOUT
   document.getElementById("logout-btn")?.addEventListener("click", async () => {
     const result = await Swal.fire({
         title: '¿Cerrar sesión?',
@@ -579,4 +766,9 @@ const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").
         window.location.href = "/admin/login";
     }
   });
+
+  // 🎯 INICIALIZAR PAGINACIÓN AL CARGAR
+  setTimeout(() => {
+    applyFilters();
+  }, 100);
 </script>
