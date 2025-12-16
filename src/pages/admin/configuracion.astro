@@ -1,0 +1,461 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { supabase } from "../../lib/supabase";
+
+// 1. AUTH & SECURITY (SSR)
+const accessToken = Astro.cookies.get("sb-access-token")?.value;
+const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
+
+if (accessToken && refreshToken) {
+  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+} else {
+  return Astro.redirect("/admin/login");
+}
+
+// 2. OBTENER DATOS DEL NEGOCIO
+const { data: businesses } = await supabase.from("businesses").select("id").limit(1);
+const businessId = businesses?.[0]?.id;
+
+if (!businessId) return Astro.redirect("/?error=no_business");
+
+// 3. FETCH DE DATOS
+const { data: services } = await supabase
+  .from("services")
+  .select("*")
+  .eq("business_id", businessId)
+  .order("name");
+
+const { data: dentists } = await supabase
+  .from("dentists")
+  .select("*")
+  .eq("business_id", businessId)
+  .order("name");
+
+// @ts-ignore
+const uniqueSpecialties = [...new Set(dentists?.map(d => d.specialty).filter(Boolean))].sort();
+---
+
+<Layout title="Configuración - Clínica Dental">
+  <div id="config-data" data-business-id={businessId}></div>
+
+  <div class="min-h-screen bg-gray-50/50 py-8">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- HEADER -->
+      <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Configuración</h1>
+          <p class="text-sm text-gray-500">Gestiona tus servicios y equipo médico</p>
+        </div>
+        <a href="/admin/dashboard" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+            <path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clip-rule="evenodd" />
+          </svg>
+          Volver al Dashboard
+        </a>
+      </div>
+
+      <!-- TABS NAVEGACIÓN -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-1 mb-6 inline-flex w-full md:w-auto">
+        <button id="tab-btn-services" class="flex-1 md:flex-none px-6 py-2.5 text-sm font-bold rounded-xl transition-all text-blue-600 bg-blue-50 shadow-sm ring-1 ring-black/5 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5.5c-1.074 -.586 -2.583 -1.5 -4 -1.5c-2.1 0 -4 1.247 -4 5c0 4.899 1.056 8.41 2.671 10.537c.573 .756 1.97 .521 2.567 -.236c.398 -.505 .819 -1.439 1.262 -2.801c.292 -.771 .892 -1.504 1.5 -1.5c.602 0 1.21 .737 1.5 1.5c.443 1.362 .864 2.295 1.262 2.8c.597 .759 2 .993 2.567 .237c1.615 -2.127 2.671 -5.637 2.671 -10.537c0 -3.74 -1.908 -5 -4 -5c-1.423 0 -2.92 .911 -4 1.5z" /><path d="M12 5.5l3 1.5" /></svg>
+          Servicios
+        </button>
+        <button id="tab-btn-dentists" class="flex-1 md:flex-none px-6 py-2.5 text-sm font-medium rounded-xl transition-all text-gray-500 hover:text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 4h-1a2 2 0 0 0 -2 2v3.5h0a5.5 5.5 0 0 0 11 0v-3.5a2 2 0 0 0 -2 -2h-1" /><path d="M8 15a6 6 0 1 0 12 0v-3" /><path d="M11 3v2" /><path d="M6 3v2" /><circle cx="20" cy="10" r="2" /></svg>
+          Doctores
+        </button>
+      </div>
+
+      <!-- ====================
+           PANEL: SERVICIOS
+      ==================== -->
+      <section id="panel-services" class="space-y-6 animate-fade-in">
+        <!-- Toolbar -->
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div class="flex-1 w-full flex items-center gap-3">
+            <div class="relative w-full max-w-md">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg></div>
+              <input type="text" id="search-service-input" class="pl-10 block w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 py-2" placeholder="Buscar tratamiento..." autocomplete="off">
+            </div>
+            <button id="clear-service-filter" class="text-gray-400 hover:text-red-500 transition-colors hidden" title="Limpiar búsqueda"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg></button>
+          </div>
+          <button id="btn-add-service" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 whitespace-nowrap">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg> Nuevo Servicio
+          </button>
+        </div>
+
+        <!-- Grid -->
+        <div id="services-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {services && services.map((service) => (
+            <div class={`service-card bg-white p-5 rounded-2xl shadow-sm border transition-all hover:shadow-md group relative ${service.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60 bg-gray-50'}`} data-name={service.name.toLowerCase()}>
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-bold text-gray-900 text-lg highlight-text">{service.name}</h3>
+                  <p class="text-sm text-gray-500 mt-1 line-clamp-2">{service.description || "Sin descripción"}</p>
+                  <div class="flex items-center gap-3 mt-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-50 text-blue-700 border border-blue-100">${service.price.toLocaleString()}</span>
+                    <span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">⏱ {service.duration} min</span>
+                  </div>
+                </div>
+                
+                <div class="flex flex-col gap-2">
+                  <button data-action="edit-service" data-id={service.id} data-json={JSON.stringify(service)} class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
+                  </button>
+                  <button data-action="toggle-service" data-id={service.id} data-active={service.is_active} class={`p-2 rounded-lg transition-colors ${service.is_active ? 'text-green-500 hover:bg-green-50' : 'text-gray-300 hover:text-green-500 hover:bg-gray-100'}`} title={service.is_active ? "Desactivar" : "Activar"}>
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
+                  </button>
+                  <!-- ELIMINAR SERVICIO -->
+                  <button data-action="delete-service" data-id={service.id} class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar definitivamente">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div id="no-services" class="hidden text-center py-10"><p class="text-gray-500">No se encontraron servicios.</p></div>
+      </section>
+
+      <!-- ====================
+           PANEL: DOCTORES
+      ==================== -->
+      <section id="panel-dentists" class="space-y-6 hidden animate-fade-in">
+        <!-- Toolbar -->
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div class="flex-1 w-full flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative w-full max-w-xs">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg></div>
+              <input type="text" id="search-dentist-input" class="pl-10 block w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 py-2" placeholder="Buscar doctor..." autocomplete="off">
+            </div>
+            <div class="relative w-full max-w-xs">
+              <select id="filter-specialty" class="block w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 py-2 pl-3 pr-10 bg-white">
+                <option value="all">Todas las especialidades</option>
+                {uniqueSpecialties && uniqueSpecialties.map((spec: string) => <option value={spec}>{spec}</option>)}
+              </select>
+            </div>
+            <button id="clear-dentist-filter" class="text-gray-400 hover:text-red-500 transition-colors hidden text-sm font-medium whitespace-nowrap">Limpiar</button>
+          </div>
+          <button id="btn-add-dentist" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 whitespace-nowrap">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg> Nuevo Doctor
+          </button>
+        </div>
+
+        <!-- Grid -->
+        <div id="dentists-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {dentists && dentists.map((dentist) => (
+            <div class={`dentist-card bg-white p-6 rounded-2xl shadow-sm border flex flex-col items-center text-center transition-all hover:shadow-md group relative ${dentist.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60 bg-gray-50'}`} data-name={dentist.name.toLowerCase()} data-specialty={dentist.specialty}>
+              
+              <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold shadow-md mb-4">{dentist.name.charAt(0).toUpperCase()}</div>
+              <h3 class="font-bold text-gray-900 text-lg">{dentist.name}</h3>
+              <p class="text-blue-600 font-medium text-sm mb-4">{dentist.specialty || "Odontólogo General"}</p>
+              
+              <div class="flex justify-center mb-2">
+                {dentist.phone ? (
+                  <a href={`https://wa.me/57${dentist.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" class="group inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366] hover:text-white transition-all duration-300 border border-[#25D366]/20 shadow-sm hover:shadow-md hover:-translate-y-0.5" title="Contactar por WhatsApp">
+                    <svg class="w-4 h-4 fill-current transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    <span class="font-semibold text-sm tracking-wide">{dentist.phone}</span>
+                  </a>
+                ) : (<span class="text-xs text-gray-400 italic py-1.5">Sin teléfono</span>)}
+              </div>
+
+              <!-- Actions -->
+              <div class="flex gap-2 w-full mt-4 border-t border-gray-100 pt-4">
+                <button data-action="edit-dentist" data-id={dentist.id} data-json={JSON.stringify(dentist)} class="flex-1 py-2 text-sm font-semibold text-gray-600 bg-gray-50 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors">Editar</button>
+                <button data-action="toggle-dentist" data-id={dentist.id} data-active={dentist.is_active} class={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors border ${dentist.is_active ? 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}>{dentist.is_active ? 'Activo' : 'Inactivo'}</button>
+                
+                <!-- ELIMINAR DOCTOR -->
+                <button data-action="delete-dentist" data-id={dentist.id} class="px-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent" title="Eliminar doctor">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
+                </button>
+              </div>
+
+            </div>
+          ))}
+        </div>
+        <div id="no-dentists" class="hidden text-center py-10"><p class="text-gray-500">No se encontraron doctores.</p></div>
+      </section>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<script>
+  import Swal from 'sweetalert2';
+  import { supabase } from "../../lib/supabase";
+
+  const businessId = document.getElementById('config-data')?.dataset.businessId;
+
+  // =========================================
+  // 1. LÓGICA DE TABS
+  // =========================================
+  const btnServices = document.getElementById('tab-btn-services');
+  const btnDentists = document.getElementById('tab-btn-dentists');
+  const panelServices = document.getElementById('panel-services');
+  const panelDentists = document.getElementById('panel-dentists');
+
+  const activeClasses = ['bg-white', 'text-gray-900', 'shadow-sm', 'ring-1', 'ring-gray-200', 'font-semibold'];
+  const inactiveClasses = ['text-gray-500', 'hover:text-gray-900', 'hover:bg-gray-200/50', 'font-medium'];
+
+  function switchTab(tab: 'services' | 'dentists') {
+    if (tab === 'services') {
+      panelServices?.classList.remove('hidden');
+      panelDentists?.classList.add('hidden');
+      btnServices?.classList.add(...activeClasses);
+      btnServices?.classList.remove(...inactiveClasses);
+      btnServices?.querySelector('svg')?.classList.add('text-blue-600');
+      btnDentists?.classList.remove(...activeClasses);
+      btnDentists?.classList.add(...inactiveClasses);
+      btnDentists?.querySelector('svg')?.classList.remove('text-blue-600');
+    } else {
+      panelServices?.classList.add('hidden');
+      panelDentists?.classList.remove('hidden');
+      btnDentists?.classList.add(...activeClasses);
+      btnDentists?.classList.remove(...inactiveClasses);
+      btnDentists?.querySelector('svg')?.classList.add('text-blue-600');
+      btnServices?.classList.remove(...activeClasses);
+      btnServices?.classList.add(...inactiveClasses);
+      btnServices?.querySelector('svg')?.classList.remove('text-blue-600');
+    }
+  }
+
+  btnServices?.addEventListener('click', () => switchTab('services'));
+  btnDentists?.addEventListener('click', () => switchTab('dentists'));
+
+
+  // =========================================
+  // 2. FILTROS (Client-Side)
+  // =========================================
+  
+  // FILTRO SERVICIOS
+  const searchServiceInput = document.getElementById('search-service-input') as HTMLInputElement;
+  const clearServiceBtn = document.getElementById('clear-service-filter');
+  const serviceCards = document.querySelectorAll('.service-card');
+  const noServicesMsg = document.getElementById('no-services');
+
+  searchServiceInput?.addEventListener('input', (e) => {
+    // @ts-ignore
+    const term = e.target.value.toLowerCase();
+    let visibleCount = 0;
+    serviceCards.forEach((card) => {
+      // @ts-ignore
+      if (card.dataset.name.includes(term)) {
+        // @ts-ignore
+        card.style.display = "block"; visibleCount++;
+      } else {
+        // @ts-ignore
+        card.style.display = "none";
+      }
+    });
+    clearServiceBtn?.classList.toggle('hidden', term.length === 0);
+    noServicesMsg?.classList.toggle('hidden', visibleCount > 0);
+  });
+
+  clearServiceBtn?.addEventListener('click', () => {
+    searchServiceInput.value = "";
+    searchServiceInput.dispatchEvent(new Event('input'));
+  });
+
+  // FILTRO DOCTORES
+  const searchDentistInput = document.getElementById('search-dentist-input') as HTMLInputElement;
+  const filterSpecialty = document.getElementById('filter-specialty') as HTMLSelectElement;
+  const clearDentistBtn = document.getElementById('clear-dentist-filter');
+  const dentistCards = document.querySelectorAll('.dentist-card');
+  const noDentistsMsg = document.getElementById('no-dentists');
+
+  function filterDentists() {
+    const term = searchDentistInput.value.toLowerCase();
+    const specialty = filterSpecialty.value;
+    let visibleCount = 0;
+
+    dentistCards.forEach((card) => {
+      // @ts-ignore
+      const name = card.dataset.name;
+      // @ts-ignore
+      const cardSpecialty = card.dataset.specialty;
+      const matchesName = name.includes(term);
+      const matchesSpecialty = specialty === 'all' || cardSpecialty === specialty;
+
+      if (matchesName && matchesSpecialty) {
+        // @ts-ignore
+        card.style.display = "flex"; visibleCount++;
+      } else {
+        // @ts-ignore
+        card.style.display = "none";
+      }
+    });
+    clearDentistBtn?.classList.toggle('hidden', term.length === 0 && specialty === 'all');
+    noDentistsMsg?.classList.toggle('hidden', visibleCount > 0);
+  }
+
+  searchDentistInput?.addEventListener('input', filterDentists);
+  filterSpecialty?.addEventListener('change', filterDentists);
+  clearDentistBtn?.addEventListener('click', () => {
+    searchDentistInput.value = "";
+    filterSpecialty.value = "all";
+    filterDentists();
+  });
+
+
+  // =========================================
+  // 3. GESTIÓN (CRUD & DELETE)
+  // =========================================
+  
+  async function deleteItem(table: string, id: string) {
+    const result = await Swal.fire({
+      title: '¿Eliminar definitivamente?',
+      text: "Si este registro tiene historial, no se podrá borrar (mejor desactívalo).",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      Swal.fire({ title: 'Eliminando...', didOpen: () => Swal.showLoading() });
+      
+      const { error } = await supabase.from(table).delete().eq('id', id);
+
+      if (error) {
+        // Código 23503 es violación de llave foránea (Integridad Referencial)
+        if (error.code === '23503') {
+          Swal.fire({
+            icon: 'error',
+            title: 'No se puede eliminar',
+            text: 'Este registro está vinculado a citas existentes. Te recomendamos desactivarlo en su lugar.',
+            confirmButtonText: 'Entendido'
+          });
+        } else {
+          Swal.fire('Error', error.message, 'error');
+        }
+      } else {
+        await Swal.fire({ icon: 'success', title: 'Eliminado', timer: 1000, showConfirmButton: false });
+        window.location.reload();
+      }
+    }
+  }
+
+  // SERVICES MODAL
+  async function openServiceModal(service: any = null) {
+    const isEdit = !!service;
+    const { value: formValues } = await Swal.fire({
+      title: isEdit ? 'Editar Servicio' : 'Nuevo Servicio',
+      html: `
+        <div class="text-left space-y-3">
+          <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label><input id="svc-name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${service?.name || ''}" placeholder="Ej: Limpieza Profunda"></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Precio ($)</label><input id="svc-price" type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${service?.price || ''}" placeholder="50000"></div>
+            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Duración (min)</label><input id="svc-duration" type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${service?.duration || 30}"></div>
+          </div>
+          <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Descripción</label><textarea id="svc-desc" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Detalles del tratamiento...">${service?.description || ''}</textarea></div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      confirmButtonColor: '#2563EB',
+      preConfirm: () => {
+        const name = (document.getElementById('svc-name') as HTMLInputElement).value;
+        const price = (document.getElementById('svc-price') as HTMLInputElement).value;
+        const duration = (document.getElementById('svc-duration') as HTMLInputElement).value;
+        const desc = (document.getElementById('svc-desc') as HTMLTextAreaElement).value;
+        if (!name || !price || !duration) { Swal.showValidationMessage('Nombre, precio y duración son obligatorios'); return false; }
+        return { name, price: parseFloat(price), duration: parseInt(duration), description: desc };
+      }
+    });
+
+    if (formValues) {
+      Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+      let error;
+      if (isEdit) {
+        const { error: err } = await supabase.from('services').update(formValues).eq('id', service.id);
+        error = err;
+      } else {
+        const { error: err } = await supabase.from('services').insert({ ...formValues, business_id: businessId, is_active: true });
+        error = err;
+      }
+      if (error) Swal.fire('Error', error.message, 'error');
+      else { await Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+    }
+  }
+
+  // DENTISTS MODAL
+  async function openDentistModal(dentist: any = null) {
+    const isEdit = !!dentist;
+    const { value: formValues } = await Swal.fire({
+      title: isEdit ? 'Editar Doctor' : 'Nuevo Doctor',
+      html: `
+        <div class="text-left space-y-3">
+          <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Completo</label><input id="doc-name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${dentist?.name || ''}" placeholder="Dr. Juan Pérez"></div>
+          <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Especialidad</label><input id="doc-specialty" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${dentist?.specialty || ''}" placeholder="Ortodoncia, General..."></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label><input id="doc-phone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${dentist?.phone || ''}"></div>
+            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label><input id="doc-email" type="email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value="${dentist?.email || ''}"></div>
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      confirmButtonColor: '#2563EB',
+      preConfirm: () => {
+        const name = (document.getElementById('doc-name') as HTMLInputElement).value;
+        const specialty = (document.getElementById('doc-specialty') as HTMLInputElement).value;
+        const phone = (document.getElementById('doc-phone') as HTMLInputElement).value;
+        const email = (document.getElementById('doc-email') as HTMLInputElement).value;
+        if (!name) { Swal.showValidationMessage('El nombre es obligatorio'); return false; }
+        return { name, specialty, phone, email };
+      }
+    });
+
+    if (formValues) {
+      Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+      let error;
+      if (isEdit) {
+        const { error: err } = await supabase.from('dentists').update(formValues).eq('id', dentist.id);
+        error = err;
+      } else {
+        const { error: err } = await supabase.from('dentists').insert({ ...formValues, business_id: businessId, is_active: true });
+        error = err;
+      }
+      if (error) Swal.fire('Error', error.message, 'error');
+      else { await Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+    }
+  }
+
+  document.getElementById('btn-add-service')?.addEventListener('click', () => openServiceModal());
+  document.getElementById('btn-add-dentist')?.addEventListener('click', () => openDentistModal());
+
+  // EVENT DELEGATION GLOBAL
+  document.addEventListener('click', async (e) => {
+    // @ts-ignore
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const { action, id, json, active } = btn.dataset;
+
+    // Servicios
+    if (action === 'edit-service') openServiceModal(JSON.parse(json));
+    if (action === 'delete-service') deleteItem('services', id);
+    if (action === 'toggle-service') {
+      const isActive = active === 'true';
+      const { error } = await supabase.from('services').update({ is_active: !isActive }).eq('id', id);
+      if (!error) window.location.reload();
+    }
+
+    // Doctores
+    if (action === 'edit-dentist') openDentistModal(JSON.parse(json));
+    if (action === 'delete-dentist') deleteItem('dentists', id);
+    if (action === 'toggle-dentist') {
+      const isActive = active === 'true';
+      const { error } = await supabase.from('dentists').update({ is_active: !isActive }).eq('id', id);
+      if (!error) window.location.reload();
+    }
+  });
+
+</script>
