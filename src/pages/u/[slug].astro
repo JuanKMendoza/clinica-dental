@@ -1,0 +1,673 @@
+---
+import BookingLayout from "../../layouts/BookingLayout.astro";
+import { supabase } from "../../lib/supabase";
+
+// 1. CAPTURAR SLUG Y DATOS DEL NEGOCIO (SSR)
+const { slug } = Astro.params;
+
+if (!slug) return Astro.redirect("/404");
+
+// Buscar el negocio específico
+const { data: business, error } = await supabase
+  .from("businesses")
+  .select("*")
+  .eq("slug", slug)
+  .single();
+
+if (error || !business) return Astro.redirect("/404");
+
+// 2. OBTENER SERVICIOS Y DENTISTAS (Filtrados por este negocio)
+const { data: services } = await supabase
+  .from("services")
+  .select("id, name, price")
+  .eq("business_id", business.id)
+  .eq("is_active", true)
+  .order("name");
+
+const { data: dentistRelations } = await supabase
+  .from("dentists")
+  .select(`id, name, dentist_services(service_id)`)
+  .eq("business_id", business.id)
+  .eq("is_active", true)
+  .order("name");
+
+// 3. LÓGICA DE MAPEO
+const serviceToDentists: Record<string, string[]> = {};
+services?.forEach((s) => (serviceToDentists[s.id] = []));
+dentistRelations?.forEach((dentist) => {
+  // @ts-ignore
+  dentist.dentist_services.forEach((ds: any) => {
+    if (serviceToDentists[ds.service_id]) {
+      serviceToDentists[ds.service_id].push(dentist.id);
+    }
+  });
+});
+
+const dentistsNames: Record<string, string> = {};
+dentistRelations?.forEach((d) => (dentistsNames[d.id] = d.name));
+
+// Teléfono para contacto
+const cleanPhone = (phone: string) => phone ? phone.replace(/\D/g, '') : '';
+const businessPhone = business.phone || '';
+---
+
+<BookingLayout 
+  title={`Agendar Cita - ${business.name}`}
+  brandColor={business.primary_color} 
+  logoUrl={business.logo_url}
+  businessName={business.name}
+>
+  
+  <div
+    id="logic-data"
+    data-relations={JSON.stringify(serviceToDentists)}
+    data-names={JSON.stringify(dentistsNames)}
+    data-business-id={business.id} 
+    class="hidden"
+  >
+  </div>
+
+  <!-- Hero (Versión Corregida con texto legible) -->
+  <section class="bg-brand-600 bg-gradient-to-r from-brand-600 to-brand-800 text-white py-16 relative overflow-hidden">
+    <div class="absolute inset-0 bg-black/10 pointer-events-none"></div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+      <h1 class="text-4xl md:text-5xl font-bold mb-4 drop-shadow-sm">Agenda tu Cita</h1>
+      <p class="text-xl text-white/90 font-medium max-w-2xl mx-auto">
+        Completa el formulario y te contactaremos en menos de 2 horas
+      </p>
+      <div class="mt-6 inline-block bg-white/20 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-sm">
+        ✨ Primera consulta completamente GRATIS
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario -->
+  <section class="py-16 bg-gray-50 px-4">
+    <div class="max-w-4xl mx-auto -mt-10 relative z-20">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-12 border border-gray-100">
+        
+        <!-- Info rápida -->
+        <div class="bg-brand-50 border-l-4 border-brand-600 p-6 mb-8 rounded-lg">
+          <div class="flex items-start">
+            <svg class="w-6 h-6 text-brand-600 flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+            </svg>
+            <div class="ml-4">
+              <h3 class="font-semibold text-gray-900 mb-2">¿Cómo funciona?</h3>
+              <ol class="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                <li>Completa el formulario con tus datos</li>
+                <li>Te contactamos en máximo 2 horas</li>
+                <li>Confirmamos tu cita según disponibilidad</li>
+                <li>¡Listo! Nos vemos en la clínica 😊</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <form id="appointment-form" class="space-y-8" novalidate>
+          
+          <!-- 1. Datos Personales -->
+          <div class="space-y-6">
+            <h2 class="text-2xl font-bold text-gray-900 pb-2 border-b-2 border-brand-600">
+              1. Datos Personales
+            </h2>
+
+            <div>
+              <label for="name" class="block text-sm font-bold text-gray-700 mb-2">Nombre completo *</label>
+              <input type="text" id="name" name="name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" placeholder="Ej: Juan Pérez" />
+              <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+              <div>
+                <label for="email" class="block text-sm font-bold text-gray-700 mb-2">Correo electrónico *</label>
+                <input type="email" id="email" name="email" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" placeholder="tu@email.com" />
+                <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+              </div>
+              <div>
+                <label for="phone" class="block text-sm font-bold text-gray-700 mb-2">Teléfono / WhatsApp *</label>
+                <input type="tel" id="phone" name="phone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" placeholder="310 123 4567" />
+                <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+              <div>
+                <label for="age" class="block text-sm font-bold text-gray-700 mb-2">Edad</label>
+                <input type="number" id="age" name="age" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" placeholder="25" />
+                <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+              </div>
+              <div>
+                <label for="document" class="block text-sm font-bold text-gray-700 mb-2">Documento de identidad *</label>
+                <input type="text" id="document" name="document" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" placeholder="1234567890" />
+                <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Información de la Cita -->
+          <div class="space-y-6 pt-4">
+            <h2 class="text-2xl font-bold text-gray-900 pb-2 border-b-2 border-brand-600">
+              2. Información de la Cita
+            </h2>
+
+            <div>
+              <label for="service" class="block text-sm font-bold text-gray-700 mb-2">¿Qué servicio necesitas? *</label>
+              <select id="service" name="service_id" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all bg-white">
+                <option value="">Selecciona un servicio...</option>
+                {services && services.map(s => <option value={s.id}>{s.name}</option>)}
+              </select>
+              <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+            </div>
+
+            <div id="dentist-container" class="opacity-0 transition-opacity duration-300 h-0 overflow-hidden">
+               <label for="dentist" class="block text-sm font-medium text-gray-700 mb-2">Profesional de preferencia (Opcional)</label>
+               <select id="dentist" name="dentist_id" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none bg-white">
+                 <option value="">Cualquiera disponible</option>
+               </select>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+               <div>
+                  <label for="date" class="block text-sm font-bold text-gray-700 mb-2">Fecha preferida *</label>
+                  <input type="date" id="date" name="date" required min={new Date().toISOString().split("T")[0]} class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all" />
+                  <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+               </div>
+               <div>
+                  <label for="time" class="block text-sm font-bold text-gray-700 mb-2">Hora preferida *</label>
+                  <select id="time" name="time" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all bg-white">
+                    <option value="">Selecciona hora...</option>
+                    <option value="08:00">08:00 AM</option>
+                    <option value="09:00">09:00 AM</option>
+                    <option value="10:00">10:00 AM</option>
+                    <option value="11:00">11:00 AM</option>
+                    <option value="12:00">12:00 PM</option>
+                    <option value="14:00">2:00 PM</option>
+                    <option value="15:00">3:00 PM</option>
+                    <option value="16:00">4:00 PM</option>
+                    <option value="17:00">5:00 PM</option>
+                    <option value="18:00">6:00 PM</option>
+                  </select>
+                  <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+               </div>
+            </div>
+
+            <div id="first_visit_container">
+              <label class="block text-sm font-bold text-gray-700 mb-3">¿Es tu primera visita a nuestra clínica? *</label>
+              <div class="flex gap-8">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="first_visit" value="si" required class="w-5 h-5 text-brand-600 focus:ring-brand-600 border-gray-300" />
+                  <span class="text-gray-700">Sí, soy nuevo</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="first_visit" value="no" class="w-5 h-5 text-brand-600 focus:ring-brand-600 border-gray-300" />
+                  <span class="text-gray-700">No, ya he venido antes</span>
+                </label>
+              </div>
+              <p class="error-message hidden text-red-600 text-sm mt-1 font-medium"></p>
+            </div>
+            
+             <div>
+              <label for="reason" class="block text-sm font-medium text-gray-700 mb-2">Cuéntanos: ¿Qué molestia o necesidad tienes?</label>
+              <textarea id="reason" name="reason" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-all resize-none"></textarea>
+            </div>
+          </div>
+
+          <!-- 3. Información Adicional -->
+          <div class="space-y-6 pt-4">
+            <h2 class="text-2xl font-bold text-gray-900 pb-2 border-b-2 border-brand-600">
+              3. Información Adicional
+            </h2>
+
+            <div>
+              <label for="source" class="block text-sm font-medium text-gray-700 mb-2">¿Cómo nos conociste?</label>
+              <select id="source" name="source" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none bg-white">
+                <option value="">Selecciona una opción</option>
+                <option value="Google">Google</option>
+                <option value="Redes Sociales">Facebook / Instagram</option>
+                <option value="Referido">Referido de un amigo/familiar</option>
+                <option value="Pasando">Pasaba por la zona</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="flex items-start space-x-3">
+                <input type="checkbox" id="terms" name="terms" required class="mt-1 w-5 h-5 text-brand-600 focus:ring-brand-600 rounded border-gray-300" />
+                <label for="terms" class="text-sm text-gray-700">
+                  Acepto la <a href="/privacidad" class="text-brand-600 hover:underline font-semibold">Política de Privacidad</a> y el tratamiento de mis datos. *
+                </label>
+              </div>
+              <p class="error-message hidden text-red-600 text-sm mt-1 ml-8 font-medium"></p>
+            </div>
+          </div>
+
+          <!-- Botón Submit -->
+          <div class="pt-6">
+            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-200 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 text-lg">
+              <span>Confirmar Cita</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+            <p class="text-center text-sm text-gray-600 mt-4">Te contactaremos en máximo 2 horas para confirmar tu cita</p>
+          </div>
+
+          <div id="form-message" class="hidden"></div>
+        </form>
+      </div>
+
+      <!-- Contacto alternativo -->
+      <div class="mt-12 grid md:grid-cols-2 gap-8">
+        
+        <!-- TARJETA TELÉFONO -->
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+          </div>
+          <h3 class="font-bold text-xl mb-2">Llámanos Directamente</h3>
+          <p class="text-gray-600 mb-4">Atención inmediata por teléfono</p>
+          
+          {business.phone ? (
+            <a 
+              href={`tel:${business.phone}`} 
+              class="inline-block bg-brand-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+            >
+              📞 {business.phone}
+            </a>
+          ) : (
+            <span class="text-gray-400 italic font-medium">Número no disponible</span>
+          )}
+        </div>
+
+        <!-- TARJETA WHATSAPP -->
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-9 h-9 text-green-600" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"></path></svg>
+          </div>
+          <h3 class="font-bold text-xl mb-2">Escríbenos por WhatsApp</h3>
+          <p class="text-gray-600 mb-4">Respuesta rápida y personalizada</p>
+          
+          {business.phone ? (
+            <a 
+              href={`https://wa.me/57${business.phone.replace(/\D/g, '')}?text=Hola!%20Quiero%20agendar%20una%20cita`}
+              target="_blank"
+              class="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"></path></svg>
+            <span>Abrir WhatsApp</span>
+          </a>
+          ) : (
+             <span class="text-gray-400 italic font-medium">WhatsApp no disponible</span>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+</BookingLayout>
+
+<script>
+  import { supabase } from "../../lib/supabase";
+
+  // ==========================================
+  // FUNCIONES DE VALIDACIÓN
+  // ==========================================
+
+  function showError(field: HTMLElement, message: string) {
+    field.classList.add("border-red-500", "border-2");
+    field.classList.remove("border-gray-300");
+    const errorMsg = field.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.textContent = message;
+      errorMsg.classList.remove("hidden");
+    }
+  }
+
+  function clearError(field: HTMLElement) {
+    field.classList.remove("border-red-500", "border-2");
+    field.classList.add("border-gray-300");
+    const errorMsg = field.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.classList.add("hidden");
+    }
+  }
+
+  function validateRequired(
+    field: HTMLInputElement | HTMLSelectElement,
+    fieldName: string
+  ): boolean {
+    const value = field.value.trim();
+    if (!value) {
+      showError(field, `El campo ${fieldName} es obligatorio`);
+      return false;
+    }
+    clearError(field);
+    return true;
+  }
+
+  function validateEmail(emailField: HTMLInputElement): boolean {
+    const value = emailField.value.trim();
+    if (!value) {
+      showError(emailField, "El correo electrónico es obligatorio");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+      showError(
+        emailField,
+        "Por favor ingresa un correo electrónico válido"
+      );
+      return false;
+    }
+    clearError(emailField);
+    return true;
+  }
+
+  function validatePhone(phoneField: HTMLInputElement): boolean {
+    const value = phoneField.value.trim();
+    if (!value) {
+      showError(phoneField, "El teléfono es obligatorio");
+      return false;
+    }
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length < 7) {
+      showError(
+        phoneField,
+        "Por favor ingresa un número de teléfono válido (mínimo 7 dígitos)"
+      );
+      return false;
+    }
+    clearError(phoneField);
+    return true;
+  }
+
+  function validateAge(ageField: HTMLInputElement): boolean {
+    const value = ageField.value.trim();
+    if (!value) {
+      clearError(ageField);
+      return true;
+    }
+    const age = parseInt(value);
+    if (isNaN(age) || age < 1 || age > 120) {
+      showError(ageField, "Por favor ingresa una edad válida (1-120 años)");
+      return false;
+    }
+    clearError(ageField);
+    return true;
+  }
+
+  function validateRadio(radioName: string, fieldLabel: string): boolean {
+    const radios = document.getElementsByName(
+      radioName
+    ) as NodeListOf<HTMLInputElement>;
+    const isChecked = Array.from(radios).some((radio) => radio.checked);
+
+    if (!isChecked) {
+      // FIX: Buscar el contenedor correcto (padre del div flex)
+      const container = document.getElementById("first_visit_container"); 
+      const errorMsg = container?.querySelector(".error-message");
+
+      if (errorMsg) {
+        errorMsg.textContent = `Por favor selecciona una opción para ${fieldLabel}`;
+        errorMsg.classList.remove("hidden");
+      }
+      return false;
+    }
+
+    const container = document.getElementById("first_visit_container");
+    const errorMsg = container?.querySelector(".error-message");
+    if (errorMsg) errorMsg.classList.add("hidden");
+    return true;
+  }
+
+  function validateCheckbox(checkbox: HTMLInputElement): boolean {
+    if (!checkbox.checked) {
+      const errorMsg = checkbox
+        .closest("div")
+        ?.parentElement?.querySelector(".error-message");
+      if (errorMsg) {
+        errorMsg.textContent =
+          "Debes aceptar los términos y condiciones para continuar";
+        errorMsg.classList.remove("hidden");
+      }
+      return false;
+    }
+
+    const errorMsg = checkbox
+      .closest("div")
+      ?.parentElement?.querySelector(".error-message");
+    if (errorMsg) {
+      errorMsg.classList.add("hidden");
+    }
+
+    return true;
+  }
+
+  function validateDate(dateField: HTMLInputElement): boolean {
+    const value = dateField.value;
+    if (!value) {
+      showError(dateField, "La fecha es obligatoria");
+      return false;
+    }
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      showError(dateField, "La fecha no puede ser anterior a hoy");
+      return false;
+    }
+    clearError(dateField);
+    return true;
+  }
+
+  function validateForm(): boolean {
+    let isValid = true;
+
+    const nameField = document.getElementById("name") as HTMLInputElement;
+    if (!validateRequired(nameField, "nombre completo")) isValid = false;
+
+    const emailField = document.getElementById("email") as HTMLInputElement;
+    if (!validateEmail(emailField)) isValid = false;
+
+    // FIX: Documento obligatorio
+    const documentField = document.getElementById("document") as HTMLInputElement;
+    if (!validateRequired(documentField, "documento")) isValid = false;
+
+    const phoneField = document.getElementById("phone") as HTMLInputElement;
+    if (!validatePhone(phoneField)) isValid = false;
+
+    const ageField = document.getElementById("age") as HTMLInputElement;
+    if (!validateAge(ageField)) isValid = false;
+
+    const serviceField = document.getElementById("service") as HTMLSelectElement;
+    if (!validateRequired(serviceField, "servicio")) isValid = false;
+
+    const dateField = document.getElementById("date") as HTMLInputElement;
+    if (!validateDate(dateField)) isValid = false;
+
+    const timeField = document.getElementById("time") as HTMLSelectElement;
+    if (!validateRequired(timeField, "hora")) isValid = false;
+
+    if (!validateRadio("first_visit", "¿Es tu primera visita?")) isValid = false;
+
+    const termsCheckbox = document.getElementById("terms") as HTMLInputElement;
+    if (!validateCheckbox(termsCheckbox)) isValid = false;
+
+    return isValid;
+  }
+
+  // ==========================================
+  // LÓGICA DE FILTRADO DE DENTISTAS
+  // ==========================================
+  const logicData = document.getElementById("logic-data");
+  const serviceToDentists = JSON.parse(logicData?.dataset.relations || "{}");
+  const dentistsNames = JSON.parse(logicData?.dataset.names || "{}");
+  const businessId = logicData?.dataset.businessId;
+
+  const serviceSelect = document.getElementById("service") as HTMLSelectElement;
+  const dentistSelect = document.getElementById("dentist") as HTMLSelectElement;
+  const dentistContainer = document.getElementById("dentist-container");
+
+  if (serviceSelect && dentistSelect) {
+    serviceSelect.addEventListener("change", () => {
+      // FIX: Limpiar error al cambiar
+      clearError(serviceSelect);
+
+      const serviceId = serviceSelect.value;
+      dentistSelect.innerHTML = '<option value="">Cualquiera disponible</option>';
+
+      if (!serviceId) {
+          dentistContainer?.classList.add("opacity-0", "h-0");
+          return;
+      }
+      
+      dentistContainer?.classList.remove("opacity-0", "h-0");
+      dentistContainer?.classList.add("h-auto");
+
+      const validDentists = serviceToDentists[serviceId] || [];
+      validDentists.forEach((dentistId: string) => {
+        const opt = document.createElement("option");
+        opt.value = dentistId;
+        opt.textContent = `Dr/a. ${dentistsNames[dentistId]}`;
+        dentistSelect.appendChild(opt);
+      });
+    });
+  }
+
+  // ==========================================
+  // LISTENERS EN TIEMPO REAL
+  // ==========================================
+  const nameField = document.getElementById("name") as HTMLInputElement;
+  nameField?.addEventListener("blur", () => validateRequired(nameField, "nombre completo"));
+  
+  const emailField = document.getElementById("email") as HTMLInputElement;
+  emailField?.addEventListener("blur", () => validateEmail(emailField));
+  
+  // FIX: Documento Listener
+  const documentField = document.getElementById("document") as HTMLInputElement;
+  documentField?.addEventListener("blur", () => validateRequired(documentField, "documento"));
+
+  const phoneField = document.getElementById("phone") as HTMLInputElement;
+  phoneField?.addEventListener("blur", () => validatePhone(phoneField));
+  
+  const ageField = document.getElementById("age") as HTMLInputElement;
+  ageField?.addEventListener("blur", () => validateAge(ageField));
+  
+  const dateField = document.getElementById("date") as HTMLInputElement;
+  dateField?.addEventListener("blur", () => validateDate(dateField));
+  
+  // FIX: Listeners para selects y radios
+  const timeSelect = document.getElementById("time") as HTMLSelectElement;
+  timeSelect?.addEventListener("change", () => { if(timeSelect.value) clearError(timeSelect); });
+
+  const firstVisitRadios = document.getElementsByName("first_visit") as NodeListOf<HTMLInputElement>;
+  firstVisitRadios.forEach(radio => {
+    radio.addEventListener("change", () => {
+        const container = document.getElementById("first_visit_container"); 
+        const errorMsg = container?.querySelector(".error-message");
+        if(errorMsg) errorMsg.classList.add("hidden");
+    });
+  });
+
+  const termsCheckbox = document.getElementById("terms") as HTMLInputElement;
+  termsCheckbox?.addEventListener("change", () => {
+    if (termsCheckbox.checked) {
+      const errorMsg = termsCheckbox.closest("div")?.parentElement?.querySelector(".error-message");
+      if (errorMsg) errorMsg.classList.add("hidden");
+    }
+  });
+
+  // ==========================================
+  // ENVÍO DEL FORMULARIO (TU LÓGICA PREFERIDA)
+  // ==========================================
+  const form = document.getElementById("appointment-form") as HTMLFormElement;
+  const formMessage = document.getElementById("form-message");
+
+  if (form && formMessage) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+        // Scroll al primer error
+        const firstError = document.querySelector(".border-red-500, .error-message:not(.hidden)");
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+      const originalText = submitButton.innerHTML;
+      submitButton.disabled = true;
+      submitButton.innerHTML = "<span>Guardando tu cita...</span>";
+
+      try {
+        const formData = new FormData(form);
+        const dentistVal = formData.get("dentist_id");
+        const dentistId = dentistVal ? dentistVal : null;
+
+        // DATOS DE LA CITA
+        const appointmentData = {
+          business_id: businessId,
+          service_id: formData.get("service_id"),
+          dentist_id: dentistId,
+          customer_name: formData.get("name"),
+          customer_email: formData.get("email"),
+          customer_phone: formData.get("phone"),
+          appointment_date: formData.get("date"),
+          appointment_time: formData.get("time"),
+          status: "pending",
+          patient_age: formData.get("age") ? parseInt(formData.get("age") as string) : null,
+          patient_doc: formData.get("document"),
+          is_first_visit: formData.get("first_visit") === "si",
+          consultation_reason: formData.get("reason"),
+          marketing_source: "Web Directa",
+          notes: "",
+        };
+
+        const { data, error } = await supabase
+          .from("appointments")
+          .insert([appointmentData])
+          .select();
+
+        if (error) throw error;
+
+        // ÉXITO (TU MENSAJE ORIGINAL + ESTILO BRAND)
+        formMessage.className = "block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6 animate-fade-in";
+        formMessage.innerHTML = `
+          <svg class="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <h3 class="text-xl font-bold text-green-900 mb-2">¡Cita agendada exitosamente!</h3>
+          <p class="text-green-800">Tu cita ha sido registrada para el <strong>${formData.get("date")}</strong> a las <strong>${formData.get("time")}</strong></p>
+          <p class="text-sm text-green-700 mt-4">Te contactaremos en máximo 2 horas para confirmar. Revisa tu email y WhatsApp 📱</p>
+          <div class="mt-6">
+            <button onclick="window.location.reload()" class="inline-block bg-brand-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+              Agendar otra cita
+            </button>
+          </div>
+        `;
+        
+        form.reset();
+        // Ocultar formulario visualmente
+        Array.from(form.children).forEach((child) => {
+            if (child.id !== 'form-message') (child as HTMLElement).style.display = 'none';
+        });
+        
+        formMessage.classList.remove('hidden');
+        formMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      } catch (error: any) {
+        console.error("Error:", error);
+        formMessage.className = "block p-6 rounded-lg bg-red-50 border-2 border-red-200 text-center mt-6";
+        formMessage.innerHTML = `
+          <h3 class="text-xl font-bold text-red-900 mb-2">Hubo un error al agendar</h3>
+          <p class="text-red-800 mb-4">${error.message || "Por favor intenta de nuevo o contáctanos por WhatsApp."}</p>
+        `;
+        formMessage.classList.remove('hidden');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
+      }
+    });
+  }
+</script>
