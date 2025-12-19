@@ -58,7 +58,8 @@ const getInitials = (name: string) =>
     is:inline
     src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"
   ></script>
- <style>
+ 
+  <style>
   /* === CALENDARIO PREMIUM UI === */
   #calendar {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
@@ -68,7 +69,7 @@ const getInitials = (name: string) =>
     --fc-now-indicator-color: #ef4444;
   }
 
-  /* TOOLBAR (Barra Superior) */
+  /* --- DESKTOP (Estándar) --- */
   .fc-header-toolbar {
     margin-bottom: 1.5rem !important;
     padding: 0 0.5rem;
@@ -78,88 +79,86 @@ const getInitials = (name: string) =>
     gap: 1rem;
   }
 
-  /* Título */
   .fc-toolbar-title {
     font-size: 1.5rem !important;
     font-weight: 800 !important;
     color: #111827;
-    letter-spacing: -0.03em;
-    text-transform: capitalize;
+    text-transform: capitalize !important; /* Mayúscula inicial */
   }
 
-  /* Botones (Estilo Píldora Moderno) */
+  /* Botones */
   .fc-button {
     background: white !important;
     border: 1px solid #e5e7eb !important;
     color: #4b5563 !important;
     font-weight: 600 !important;
-    border-radius: 10px !important;
-    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+    padding: 0.4rem 0.8rem !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     text-transform: capitalize !important;
-    font-size: 0.85rem !important;
-    outline: none !important;
   }
-  .fc-button:hover { background-color: #f9fafb !important; color: #111827 !important; border-color: #d1d5db !important; }
+  .fc-button:hover { background-color: #f9fafb !important; }
   .fc-button-active { background-color: #1f2937 !important; border-color: #1f2937 !important; color: white !important; }
   
-  /* Botones de Flecha */
-  .fc-prev-button, .fc-next-button { padding: 0.4rem 0.8rem !important; border-radius: 99px !important; }
-  .fc-icon { font-size: 1.1rem !important; }
-
-  /* GRID */
+  .fc-prev-button, .fc-next-button, .fc-datePickerBtn-button { 
+    display: flex !important; align-items: center; justify-content: center;
+    width: 36px !important; height: 36px !important; padding: 0 !important;
+    background-color: #1f2937 !important; color: white !important; border: none !important;
+  }
+  
+  /* Grid */
   .fc-scrollgrid { border: none !important; }
-  .fc-col-header-cell-cushion { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #9ca3af; text-decoration: none !important; padding-bottom: 10px; }
+  .fc-col-header-cell-cushion { font-size: 0.75rem; font-weight: 700; color: #9ca3af; padding-bottom: 10px; text-transform: capitalize !important; }
   .fc-timegrid-slot { height: 4rem !important; border-bottom: 1px dashed #f3f4f6 !important; }
 
-  /* 📱 MÓVIL: DISEÑO PREMIUM */
+  /* --- 📱 MÓVIL: DISEÑO GRID ESTRICTO (SOLUCIÓN DEFINITIVA) --- */
   @media (max-width: 768px) {
     .fc-header-toolbar {
-      flex-direction: column !important;
-      gap: 12px !important;
-      align-items: stretch !important;
+      display: grid !important;
+      /* 2 columnas iguales, 2 filas automáticas */
+      grid-template-columns: 1fr 1fr !important;
+      grid-template-rows: auto auto !important;
+      gap: 15px !important;
+      width: 100% !important;
     }
 
-    /* FILA 1: Título y Navegación (Izquierda y Derecha) */
-    .fc-toolbar-chunk:first-child {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
+    /* 1. SECCIÓN CENTRAL (TÍTULO) -> Lo forzamos a la FILA 1, ocupando TODO el ancho */
+    .fc-toolbar-chunk:nth-child(2) {
+      grid-row: 1 !important;
+      grid-column: 1 / -1 !important; /* De la primera a la última columna */
+      display: flex !important;
+      justify-content: center !important;
+      width: 100% !important;
     }
-    .fc-toolbar-title { font-size: 1.25rem !important; }
 
-    /* FILA 2: Selector de Vistas (Estilo iOS Segmented Control) */
-    .fc-toolbar-chunk:last-child {
-      display: flex;
-      background: #f3f4f6;
-      padding: 4px;
-      border-radius: 12px;
-      justify-content: space-between;
+    /* Estilo del título en móvil */
+    .fc-toolbar-title { 
+      font-size: 1.5rem !important; 
+      width: 100%; 
+      text-align: center;
     }
-    
-    /* Botones de vista ocupan espacio igual */
-    .fc-dayGridMonth-button, .fc-timeGridWeek-button, .fc-timeGridDay-button {
-      flex: 1;
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      font-size: 0.8rem !important;
-      margin: 0 !important;
-      border-radius: 8px !important;
+
+    /* 2. SECCIÓN IZQUIERDA (NAVEGACIÓN) -> Fila 2, Columna 1 */
+    .fc-toolbar-chunk:nth-child(1) {
+      grid-row: 2 !important;
+      grid-column: 1 !important;
+      justify-self: start !important;
     }
-    
-    .fc-button-active {
-      background: white !important;
-      color: black !important;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+
+    /* 3. SECCIÓN DERECHA (VISTAS) -> Fila 2, Columna 2 */
+    .fc-toolbar-chunk:nth-child(3) {
+      grid-row: 2 !important;
+      grid-column: 2 !important;
+      justify-self: end !important;
     }
-    
-    /* Ajustes generales móvil */
-    #calendar-view-container { padding: 1rem !important; }
+
+    /* Ajustes generales */
+    #calendar-view-container { padding: 0.5rem !important; }
     .fc-timegrid-slot { height: 5rem !important; }
+    .fc-today-button { display: none !important; }
   }
 </style>
+
   <div
     id="app-data"
     data-services={JSON.stringify(servicesList)}
@@ -170,7 +169,7 @@ const getInitials = (name: string) =>
   </div>
 
   <div class="max-w-7xl mx-auto">
-    <!-- HEADER ESTILO TARJETA (CONSERVADO EXACTAMENTE) -->
+    <!-- HEADER ESTILO TARJETA -->
     <div
       class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-6"
     >
@@ -213,14 +212,11 @@ const getInitials = (name: string) =>
             ></path></svg
           > Nueva Cita
         </button>
-        <!-- Botón volver eliminado ya que tenemos menú lateral, pero si lo quieres conservar descomenta la linea de abajo -->
-        <!-- <a href="/" class="flex-1 md:flex-none px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-center">Volver al Sitio</a> -->
       </div>
     </div>
 
     <!-- KPIs / RESUMEN -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <!-- Total -->
       <div
         class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md"
       >
@@ -249,7 +245,6 @@ const getInitials = (name: string) =>
         >
       </div>
 
-      <!-- Pendientes -->
       <div
         class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-yellow-200"
       >
@@ -276,7 +271,6 @@ const getInitials = (name: string) =>
         <span class="text-3xl font-bold text-gray-900">{pending}</span>
       </div>
 
-      <!-- Confirmadas -->
       <div
         class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-brand-200"
       >
@@ -304,7 +298,6 @@ const getInitials = (name: string) =>
         <span class="text-3xl font-bold text-gray-900">{confirmed}</span>
       </div>
 
-      <!-- Completadas -->
       <div
         class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-28 transition-all hover:shadow-md hover:border-emerald-200"
       >
@@ -371,7 +364,7 @@ const getInitials = (name: string) =>
       </div>
     </div>
 
-    <!-- FILTROS (CONSERVADOS EXACTAMENTE) -->
+    <!-- FILTROS -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
         <div class="md:col-span-3">
@@ -446,8 +439,9 @@ const getInitials = (name: string) =>
         >
       </div>
     </div>
+
+    <!-- LISTA (Tabla) -->
     <div id="list-view-container">
-      <!-- TABLA PRINCIPAL (CONSERVADA CON CAMBIOS DE ELIMINAR INCLUIDOS) -->
       <div
         class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
       >
@@ -733,7 +727,7 @@ const getInitials = (name: string) =>
                                     fill="currentColor"
                                     class="w-4 h-4 pointer-events-none"
                                   >
-                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
                                   </svg>
                                 </button>
                               </>
@@ -942,15 +936,12 @@ const getInitials = (name: string) =>
         </div>
       </div>
     </div>
-    <!-- CONTENEDOR VISTA CALENDARIO (Oculto por defecto) -->
     <!-- CONTENEDOR VISTA CALENDARIO -->
-<div id="calendar-view-container" class="hidden bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[600px] mt-6 relative">
-    
-    <!-- 🔥 NUEVO: Input nativo oculto para el selector de fecha -->
-    <input type="date" id="date-navigator" class="absolute top-5 right-16 opacity-0 z-0 w-8 h-8 cursor-pointer">
-    
-    <div id="calendar" class="relative z-10"></div>
-</div>
+    <div id="calendar-view-container" class="hidden bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[600px] mt-6 relative">
+        <!-- 🔥 NUEVO: Input nativo oculto para el selector de fecha -->
+        <input type="date" id="date-navigator" class="absolute top-5 right-16 opacity-0 z-0 w-8 h-8 cursor-pointer">
+        <div id="calendar" class="relative z-10"></div>
+    </div>
 </AdminLayout>
 
 <script>
@@ -978,8 +969,6 @@ const getInitials = (name: string) =>
   const viewCalendarBtn = document.getElementById('view-calendar-btn');
   const listViewContainer = document.getElementById('list-view-container');
   const calendarViewContainer = document.getElementById('calendar-view-container');
-  
-  // 🔥 ELEMENTO CLAVE: Selector de fecha nativo
   const dateNavigatorInput = document.getElementById('date-navigator') as HTMLInputElement;
 
   // PAGINACIÓN
@@ -988,7 +977,7 @@ const getInitials = (name: string) =>
   let allFilteredRows: HTMLElement[] = [];
 
   // ==========================================
-  // 1. FILTRADO (Lógica Original Intacta)
+  // 1. FILTRADO
   // ==========================================
   function applyFilters() {
     const dateVal = filterDate.value || "all";
@@ -1037,7 +1026,7 @@ const getInitials = (name: string) =>
     currentPage = 1;
     updatePagination();
 
-    // Sincronizar Calendario si está visible
+    // Sincronizar Calendario
     if (calendarInstance) {
         // @ts-ignore
         const allEvents = calendarInstance.getEvents();
@@ -1059,7 +1048,7 @@ const getInitials = (name: string) =>
   }
 
   // ==========================================
-  // 2. PAGINACIÓN (INTACTO)
+  // 2. PAGINACIÓN
   // ==========================================
   function updatePagination() {
     const totalItems = allFilteredRows.length;
@@ -1208,7 +1197,10 @@ const getInitials = (name: string) =>
   }
 
   // ==========================================
-  // 5. INICIALIZAR CALENDARIO (PREMIUM + FECHA)
+  // 5. INICIALIZAR CALENDARIO (PREMIUM DEFINITIVO)
+  // ==========================================
+  // ==========================================
+  // 5. INICIALIZAR CALENDARIO
   // ==========================================
   function initCalendar() {
     const calendarEl = document.getElementById('calendar');
@@ -1229,7 +1221,6 @@ const getInitials = (name: string) =>
         const durationMin = apt.services?.duration || 30;
         const start = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
         const end = new Date(start.getTime() + durationMin * 60000);
-        // SOLUCIÓN NOMBRE DOCTOR
         const rawName = apt.dentists?.name || '';
         const cleanName = rawName.replace(/^(Dr\.|Dra\.|Dr|Dra)\s+/i, '');
         const firstName = cleanName.split(' ')[0];
@@ -1259,29 +1250,27 @@ const getInitials = (name: string) =>
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
         
-        // 🔥 HEADER MEJORADO + BOTÓN DATEPICKER
-        headerToolbar: isMobile 
-            ? { 
-                left: 'title', 
-                right: 'prev,datePickerBtn,next', 
-                center: 'dayGridMonth,timeGridWeek,timeGridDay' 
-              } 
-            : { 
-                left: 'prev,next today datePickerBtn', 
-                center: 'title', 
-                right: 'dayGridMonth,timeGridWeek,timeGridDay' 
-              },
-            
-        titleFormat: isMobile ? { month: 'short', year: 'numeric' } : { month: 'long', year: 'numeric' },
+        // 🔥 HEADER FIJO: 3 Bloques para que el CSS Grid los ubique
+        headerToolbar: { 
+            left: 'prev,datePickerBtn,next',  // Bloque 1 (CSS lo pone abajo a la izq)
+            center: 'title',                 // Bloque 2 (CSS lo pone ARRIBA y expandido)
+            right: 'dayGridMonth,timeGridWeek,timeGridDay' // Bloque 3 (CSS lo pone abajo a la der)
+        },
         
-        // 🔥 BOTÓN PERSONALIZADO (DATEPICKER)
+        // Formatos de título con nombre completo del mes
+        views: {
+            dayGridMonth: { titleFormat: { year: 'numeric', month: 'long' } }, 
+            timeGridWeek: { titleFormat: { year: 'numeric', month: 'short', day: 'numeric' } },
+            timeGridDay: { titleFormat: { weekday: 'long', day: 'numeric', month: 'long' } }
+        },
+        
         customButtons: {
             datePickerBtn: {
                 text: '📅',
                 click: function() {
                     if(dateNavigatorInput) {
                         if(dateNavigatorInput.showPicker) dateNavigatorInput.showPicker();
-                        else dateNavigatorInput.click(); 
+                        else dateNavigatorInput.click();
                     }
                 }
             }
@@ -1300,14 +1289,12 @@ const getInitials = (name: string) =>
         selectable: true,
         selectMirror: true,
         
-        // DISEÑO TARJETA (Sólida en día/semana)
         eventContent: function(arg: any) {
             const props = arg.event.extendedProps;
             let style = getStatusStyle(props.status);
             const timeString = arg.timeText.replace(' - ', '-');
             const isTimeGrid = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
 
-            // Override para vista diaria/semanal: Fondo Sólido Azul
             if (isTimeGrid && props.status === 'confirmed') {
                 style.bg = 'bg-brand-600 shadow-md'; style.text = 'text-white'; style.border = 'border-brand-700';
             }
@@ -1324,7 +1311,6 @@ const getInitials = (name: string) =>
             `};
         },
 
-        // CLICK
         eventClick: function(info: any) {
             const props = info.event.extendedProps;
             Swal.fire({
@@ -1334,7 +1320,6 @@ const getInitials = (name: string) =>
             });
         },
 
-        // DRAG & DROP
         eventDrop: async function(info: any) {
             const newDate = info.event.start.toISOString().split('T')[0];
             const newTime = info.event.start.toTimeString().slice(0, 5);
@@ -1350,7 +1335,6 @@ const getInitials = (name: string) =>
             } else { info.revert(); }
         },
 
-        // SELECT EMPTY (Click en hueco)
         select: function(info: any) {
             let selectedDate = info.startStr;
             let selectedTime = "08:00";
@@ -1377,10 +1361,8 @@ const getInitials = (name: string) =>
             const w = window.innerWidth;
             if (arg.view.type === 'timeGridWeek' && w < 768) {
                 calendarInstance.changeView('timeGridDay');
-                calendarInstance.setOption('headerToolbar', { left: 'title', right: 'prev,datePickerBtn,next' });
             } else if (arg.view.type === 'timeGridDay' && w >= 768) {
                 calendarInstance.changeView('timeGridWeek');
-                calendarInstance.setOption('headerToolbar', { left: 'prev,next today datePickerBtn', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' });
             }
         }
     });
@@ -1410,44 +1392,18 @@ const getInitials = (name: string) =>
   document.getElementById("btn-next-page")?.addEventListener("click", () => { if (currentPage < Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE)) currentPage++; updatePagination(); });
   document.getElementById("btn-last-page")?.addEventListener("click", () => { currentPage = Math.ceil(allFilteredRows.length / ITEMS_PER_PAGE); updatePagination(); });
 
-  // 🔥 EXCEL RESTAURADO COMPLETAMENTE 🔥
+  // EXCEL COMPLETO
   exportBtn?.addEventListener("click", () => {
     const statusTranslate: any = { 'pending': 'Pendiente', 'confirmed': 'Confirmada', 'completed': 'Completada', 'cancelled': 'Cancelada' };
-    
-    // Encabezados Completos
     let csv = "Fecha;Hora;Paciente;Documento;Edad;Telefono;Email;Servicio;Dentista;Estado;Origen;Motivo\n";
-    
     allFilteredRows.forEach(row => {
         const ds = row.dataset;
-        // Limpieza de caracteres problemáticos
         const clean = (str: string | undefined) => (str || "").replace(/"/g, '""').replace(/;/g, ',');
-
-        const line = [
-            ds.date,
-            ds.time,
-            clean(ds.name),
-            clean(ds.doc),
-            ds.age,
-            ds.phone,
-            ds.email,
-            clean(ds.service),
-            clean(ds.dentistName),
-            statusTranslate[ds.status || ""] || ds.status,
-            ds.source,
-            clean(ds.reason)
-        ];
-        
-        // Unir con punto y coma para Excel en español
+        const line = [ds.date, ds.time, clean(ds.name), clean(ds.doc), ds.age, ds.phone, ds.email, clean(ds.service), clean(ds.dentistName), statusTranslate[ds.status || ""] || ds.status, ds.source, clean(ds.reason)];
         csv += line.map(field => `"${field || ''}"`).join(';') + "\n";
     });
-
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reporte_citas_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `reporte_citas_${new Date().toISOString().slice(0,10)}.csv`; a.click(); window.URL.revokeObjectURL(url);
   });
 
   document.getElementById("new-appointment-btn")?.addEventListener("click", () => openNewAppointmentModal());
