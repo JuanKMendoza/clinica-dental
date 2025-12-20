@@ -1225,6 +1225,14 @@ const getInitials = (name: string) =>
   async function openNewAppointmentModal(prefilledDate?: string, prefilledTime?: string) {
     const serviceOptions = servicesList.map((s: any) => `<option value="${s.id}">${s.name}</option>`).join("");
     const dentistOptions = dentistsList.map((d: any) => `<option value="${d.id}">${d.name}</option>`).join("");
+
+    const sourceOptions = `
+  <option value="presencial">Presencial</option>
+  <option value="telefono">Teléfono</option>
+  <option value="google">Google</option>
+  <option value="referido">Referido</option>
+  <option value="otro">Otro</option>
+`;
     
     const { value: formValues } = await Swal.fire({
       title: '<h2 class="text-2xl font-bold text-gray-800">📅 Nueva Cita</h2>',
@@ -1235,13 +1243,17 @@ const getInitials = (name: string) =>
             <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono*</label><input id="new-phone" type="tel" class="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm"></div>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label><input id="new-email" type="email" class="w-full px-3 py-2 border rounded-lg bg-gray-50 text-sm"></div>
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Doc</label><input id="new-document" class="w-full px-3 py-2 border rounded-lg bg-gray-50 text-sm"></div>
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Edad</label><input id="new-age" type="number" class="w-full px-3 py-2 border rounded-lg text-sm"></div>
-            <div class="col-span-2"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Origen</label><select id="new-source" class="w-full px-3 py-2 border rounded-lg bg-white text-sm"><option value="presencial">Presencial</option><option value="telefono">Teléfono</option><option value="google">Google</option><option value="referido">Referido</option></select></div>
-          </div>
+  <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label><input id="new-email" type="email" class="w-full px-3 py-2 border rounded-lg bg-gray-50 text-sm"></div>
+  <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Doc*</label><input id="new-document" required class="w-full px-3 py-2 border rounded-lg bg-gray-50 text-sm"></div>
+</div>
+<div class="grid grid-cols-3 gap-3">
+  <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Edad</label><input id="new-age" type="number" min="1" max="120" class="w-full px-3 py-2 border rounded-lg text-sm"></div>
+  <div class="col-span-2"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Origen</label><select id="new-source" class="w-full px-3 py-2 border rounded-lg bg-white text-sm">${sourceOptions}</select></div>
+</div>
+<div>
+  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Motivo de Consulta</label>
+  <textarea id="new-reason" rows="2" class="w-full px-3 py-2 border rounded-lg bg-gray-50 text-sm resize-none" placeholder="Ej: Dolor de muela, limpieza dental..."></textarea>
+</div>
           <div class="grid grid-cols-2 gap-3">
             <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Servicio*</label><select id="new-service" class="w-full px-3 py-2 border rounded-lg bg-white text-sm"><option value="">Selecciona...</option>${serviceOptions}</select></div>
             <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dentista</label><select id="new-dentist" class="w-full px-3 py-2 border rounded-lg bg-white text-sm"><option value="">Cualquiera</option>${dentistOptions}</select></div>
@@ -1255,18 +1267,26 @@ const getInitials = (name: string) =>
       width: "500px", showCancelButton: true, confirmButtonText: "Crear", cancelButtonText: "Cancelar",
       customClass: { confirmButton: 'bg-brand-600 hover:bg-brand-700', popup: 'rounded-2xl' },
       preConfirm: () => {
-        const name = (document.getElementById("new-name") as HTMLInputElement).value.trim();
-        const phone = (document.getElementById("new-phone") as HTMLInputElement).value.trim();
-        const date = (document.getElementById("new-date") as HTMLInputElement).value;
-        const time = (document.getElementById("new-time") as HTMLInputElement).value;
-        const service = (document.getElementById("new-service") as HTMLSelectElement).value;
-        if (!name || !phone || !date || !time || !service) { Swal.showValidationMessage("Faltan datos obligatorios (*)"); return false; }
+  const name = (document.getElementById("new-name") as HTMLInputElement).value.trim();
+  const phone = (document.getElementById("new-phone") as HTMLInputElement).value.trim();
+  const documentId = (document.getElementById("new-document") as HTMLInputElement).value.trim();
+  const date = (document.getElementById("new-date") as HTMLInputElement).value;
+  const time = (document.getElementById("new-time") as HTMLInputElement).value;
+  const service = (document.getElementById("new-service") as HTMLSelectElement).value;
+  
+  if (!name || !phone || !documentId || !date || !time || !service) { 
+    Swal.showValidationMessage("Faltan datos obligatorios (*)"); 
+    return false; 
+  }
         return {
-          name, phone, date, time, service,
-          email: (document.getElementById("new-email") as HTMLInputElement).value.trim(),
-          documentId: (document.getElementById("new-document") as HTMLInputElement).value.trim(),
-          dentist: (document.getElementById("new-dentist") as HTMLSelectElement).value,
-        };
+  name, phone, date, time, service,
+  email: (document.getElementById("new-email") as HTMLInputElement).value.trim(),
+  documentId: documentId,
+  age: (document.getElementById("new-age") as HTMLInputElement).value.trim(),
+  source: (document.getElementById("new-source") as HTMLSelectElement).value,
+  reason: (document.getElementById("new-reason") as HTMLTextAreaElement).value.trim(),
+  dentist: (document.getElementById("new-dentist") as HTMLSelectElement).value,
+};
       }
     });
 
@@ -1297,6 +1317,7 @@ const getInitials = (name: string) =>
                   patient_age: formValues.age ? parseInt(formValues.age) : null,
                   marketing_source: formValues.source,
                   is_first_visit: false, // Asumimos false si lo crea el admin, o podrías agregar un checkbox en el modal
+                  consultation_reason: formValues.reason || null,
                   
                   // Datos para el Email (Leídos del dataset que agregamos arriba)
                   business_name: appData?.dataset.businessName,
