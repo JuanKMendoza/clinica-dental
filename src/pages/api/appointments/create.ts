@@ -165,8 +165,23 @@ export const POST: APIRoute = async ({ request }) => {
                 </div>
                 <div class="tips"><strong>💡 Importante:</strong> Recuerda llegar 10 minutos antes.</div>
                 <div class="button-container">
-                  <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business_address || business_name)}" target="_blank" class="button">📍 Ver Ubicación</a>
-                </div>
+  <a
+    href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business_address || business_name)}"
+    target="_blank"
+    style="
+      background-color:${mainColor};
+      color:#ffffff !important;
+      padding:14px 28px;
+      text-decoration:none;
+      border-radius:8px;
+      font-weight:700;
+      display:inline-block;
+      font-size:16px;
+    "
+  >
+    📍 Ver Ubicación
+  </a>
+</div>
               </div>
               <div class="footer">
             ${business_address ? `<p style="margin-bottom: 5px;">${business_address}</p>` : ''}

@@ -64,6 +64,9 @@ const businessPhone = business.phone || '';
     data-names={JSON.stringify(dentistsNames)}
     data-business-id={business.id} 
     data-business-address={business.address}
+    data-business-name={business.name}
+    data-brand-color={business.primary_color}
+    data-logo-url={business.logo_url || ""}
     class="hidden"
   >
   </div>
@@ -608,66 +611,60 @@ const businessPhone = business.phone || '';
         const dentistVal = formData.get("dentist_id");
         const dentistId = dentistVal ? dentistVal : null;
 
-        // 1. Obtener nombre del servicio para el correo
+        // 1. Obtener datos auxiliares del DOM
+        const logicData = document.getElementById("logic-data");
+        const businessId = logicData?.dataset.businessId;
+        
+        // Textos para el correo
         const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
         const serviceNameClean = selectedServiceOption ? selectedServiceOption.text.split(' - $')[0] : "Consulta General"; 
         
-        // 2. Obtener nombre del doctor seleccionado para el correo
         const selectedDentistOption = dentistSelect.options[dentistSelect.selectedIndex];
         const doctorNameClean = (dentistVal && selectedDentistOption) ? selectedDentistOption.text : "Especialista Asignado";
-        
-        //Direccion
-        const businessAddress = logicData?.dataset.businessAddress || '';
 
-        // DATOS DE LA CITA
-        const appointmentData = {
-          business_id: businessId,
-          service_id: formData.get("service_id"),
-          dentist_id: dentistId,
-          customer_name: formData.get("name"),
-          customer_email: formData.get("email"),
-          customer_phone: formData.get("phone"),
-          appointment_date: formData.get("date"),
-          appointment_time: formData.get("time"),
-          status: "pending",
-          patient_age: formData.get("age") ? parseInt(formData.get("age") as string) : null,
-          patient_doc: formData.get("document"),
-          is_first_visit: formData.get("first_visit") === "si",
-          consultation_reason: formData.get("reason"),
-          marketing_source: formData.get("source") || "Web Directa",
-          notes: "",
-        };
-
-        // 3. GUARDAR EN BD
-        const { data, error } = await supabase
-          .from("appointments")
-          .insert([appointmentData])
-          .select();
-
-        if (error) throw error;
-
-        // 4. 🔥 ENVIAR CORREO (Llamada al Backend con TODOS los datos de marca)
-        fetch("/api/send-booking-email", {
+        // 2. 🔥 LLAMADA UNIFICADA AL CEREBRO CENTRAL (API)
+        // Ya no insertamos en Supabase directo, el API lo hace todo (Paciente + Cita + Email)
+        const response = await fetch("/api/appointments/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // Datos del Paciente
-            patientName: formData.get("name"),
-            patientEmail: formData.get("email"),
-            date: formData.get("date"),
-            time: formData.get("time"),
-            serviceName: serviceNameClean,
-            doctorName: doctorNameClean,
-            
-            // Datos de la Clínica (Branding)
-            businessName: document.title.replace('Agendar Cita - ', ''),
-            brandColor: getComputedStyle(document.body).getPropertyValue('--color-brand'), // Leemos el color del CSS!
-            logoUrl: "{business.logo_url}", // Astro inyectará la URL del logo aquí
-            businessAddress: businessAddress  // Astro inyectará la dirección aquí
-          }),
-        }).catch(err => console.error("Error enviando email:", err));
+            // Datos del Negocio
+            business_id: businessId,
+            business_name: logicData?.dataset.businessName,
+            brand_color: logicData?.dataset.brandColor,
+            logo_url: logicData?.dataset.logoUrl,
+            business_address: logicData?.dataset.businessAddress,
 
-        // ÉXITO
+            // Datos de la Cita
+            service_id: formData.get("service_id"),
+            dentist_id: dentistId,
+            appointment_date: formData.get("date"),
+            appointment_time: formData.get("time"),
+            
+            // Datos del Paciente (Para crear o vincular)
+            customer_name: formData.get("name"),
+            customer_email: formData.get("email"),
+            customer_phone: formData.get("phone"),
+            patient_doc: formData.get("document"),
+            patient_age: formData.get("age") ? parseInt(formData.get("age") as string) : null,
+            
+            // Metadatos
+            status: "pending",
+            is_first_visit: formData.get("first_visit") === "si",
+            consultation_reason: formData.get("reason"),
+            marketing_source: formData.get("source") || "Web Directa",
+            
+            // Nombres legibles para el email
+            service_name: serviceNameClean,
+            dentist_name: doctorNameClean
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) throw new Error(result.error || "Error al procesar tu solicitud");
+
+        // ÉXITO (Misma UI que tenías)
         formMessage.className = "block p-6 rounded-lg bg-green-50 border-2 border-green-200 text-center mt-6 animate-fade-in";
         formMessage.innerHTML = `
           <svg class="w-12 h-12 text-green-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
