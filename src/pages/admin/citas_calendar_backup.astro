@@ -59,187 +59,103 @@ const getInitials = (name: string) =>
     src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"
   ></script>
  
- <style>
-  /* === 🎨 MATERIAL DESIGN CALENDAR OVERRIDE === */
-  
-  :root {
-    --fc-border-color: #f3f4f6; /* Gray 100 */
-    --fc-today-bg-color: transparent;
-    --fc-neutral-bg-color: #f9fafb;
-    --fc-list-event-hover-bg-color: #f3f4f6;
-    --fc-page-bg-color: #ffffff;
-  }
-
+  <style>
+  /* === CALENDARIO PREMIUM UI === */
   #calendar {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    max-width: 100%;
-    margin: 0 auto;
+    --fc-border-color: transparent;
+    --fc-page-bg-color: #ffffff;
+    --fc-today-bg-color: rgba(var(--color-brand), 0.04);
+    --fc-now-indicator-color: #ef4444;
   }
 
-  /* 1. HEADER & TOOLBAR (Material 3 Style) */
+  /* --- DESKTOP (Estándar) --- */
   .fc-header-toolbar {
     margin-bottom: 1.5rem !important;
     padding: 0 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 1rem;
   }
 
   .fc-toolbar-title {
-    font-size: 1.25rem !important;
-    font-weight: 700 !important;
+    font-size: 1.5rem !important;
+    font-weight: 800 !important;
     color: #111827;
-    text-transform: capitalize !important;
-    letter-spacing: -0.025em;
+    text-transform: capitalize !important; /* Mayúscula inicial */
   }
 
-  /* Botones Redondeados (Pills) */
+  /* Botones */
   .fc-button {
-    border-radius: 9999px !important; /* Full rounded */
-    padding: 0.5rem 1rem !important;
-    font-size: 0.875rem !important;
-    font-weight: 600 !important;
-    text-transform: capitalize !important;
-    transition: all 0.2s ease !important;
-    box-shadow: none !important;
-    border: none !important;
-    background-color: transparent !important;
-    color: #4b5563 !important; /* Gray 600 */
-  }
-
-  .fc-button:hover {
-    background-color: #f3f4f6 !important; /* Gray 100 */
-    color: #111827 !important;
-  }
-
-  .fc-button-primary:not(:disabled).fc-button-active,
-  .fc-button-primary:not(:disabled):active {
-    background-color: rgba(var(--color-brand), 0.1) !important;
-    color: rgb(var(--color-brand)) !important; /* Brand Color */
-    font-weight: 700 !important;
-  }
-
-  /* Botones de Navegación (< >) más compactos */
-  .fc-prev-button, .fc-next-button {
-    width: 32px !important;
-    height: 32px !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    background-color: #f9fafb !important;
+    background: white !important;
     border: 1px solid #e5e7eb !important;
-    color: #374151 !important;
-  }
-  .fc-prev-button:hover, .fc-next-button:hover {
-    border-color: #d1d5db !important;
-    background-color: #fff !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-  }
-
-  /* Botón DatePicker Custom */
-  .fc-datePickerBtn-button {
-    font-size: 1.2rem !important;
-    padding: 0.2rem 0.6rem !important;
-    background: transparent !important;
-  }
-
-  /* 2. GRID & CELLS */
-  .fc-theme-standard td, .fc-theme-standard th {
-    border-color: var(--fc-border-color) !important;
-  }
-  .fc-scrollgrid {
-    border: none !important;
-  }
-  .fc-col-header-cell-cushion {
-    padding: 12px 0 !important;
-    font-size: 0.75rem !important;
+    color: #4b5563 !important;
     font-weight: 600 !important;
-    text-transform: uppercase !important;
-    color: #9ca3af !important; /* Gray 400 */
-    letter-spacing: 0.05em;
+    border-radius: 8px !important;
+    padding: 0.4rem 0.8rem !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    text-transform: capitalize !important;
   }
-  .fc-timegrid-slot {
-    height: 3.5rem !important; /* Celdas más altas para mejor click */
-    border-bottom: 1px dashed #f3f4f6 !important;
+  .fc-button:hover { background-color: #f9fafb !important; }
+  .fc-button-active { background-color: #1f2937 !important; border-color: #1f2937 !important; color: white !important; }
+  
+  .fc-prev-button, .fc-next-button, .fc-datePickerBtn-button { 
+    display: flex !important; align-items: center; justify-content: center;
+    width: 36px !important; height: 36px !important; padding: 0 !important;
+    background-color: #1f2937 !important; color: white !important; border: none !important;
   }
-  .fc-timegrid-axis-cushion {
-    font-size: 0.75rem !important;
-    color: #9ca3af !important;
-  }
+  
+  /* Grid */
+  .fc-scrollgrid { border: none !important; }
+  .fc-col-header-cell-cushion { font-size: 0.75rem; font-weight: 700; color: #9ca3af; padding-bottom: 10px; text-transform: capitalize !important; }
+  .fc-timegrid-slot { height: 4rem !important; border-bottom: 1px dashed #f3f4f6 !important; }
 
-  /* Indicador de "Ahora" */
-  .fc-now-indicator-line {
-    border-color: #ef4444 !important; /* Red 500 */
-    border-width: 2px !important;
-  }
-  .fc-now-indicator-arrow {
-    border-color: #ef4444 !important;
-    border-width: 6px !important;
-  }
-
-  /* 📱 MOBILE OPTIMIZED LAYOUT (STACKED) */
+  /* --- 📱 MÓVIL: DISEÑO GRID ESTRICTO (SOLUCIÓN DEFINITIVA) --- */
   @media (max-width: 768px) {
     .fc-header-toolbar {
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: 12px !important;
-    }
-
-    /* FILA 1: Título (Izq) + Navegación (Der) */
-    .fc-toolbar-chunk:nth-child(1) {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: center !important;
+      display: grid !important;
+      /* 2 columnas iguales, 2 filas automáticas */
+      grid-template-columns: 1fr 1fr !important;
+      grid-template-rows: auto auto !important;
+      gap: 15px !important;
       width: 100% !important;
-      order: 1;
-    }
-    
-    .fc-toolbar-title {
-      font-size: 1.5rem !important; /* Título grande en móvil */
     }
 
-    /* Escondemos el botón 'Today' en móvil para ahorrar espacio */
-    .fc-today-button {
-      display: none !important;
-    }
-
-    /* FILA 2: Selector de Vistas (Tabs) */
+    /* 1. SECCIÓN CENTRAL (TÍTULO) -> Lo forzamos a la FILA 1, ocupando TODO el ancho */
     .fc-toolbar-chunk:nth-child(2) {
-      order: 2;
-      width: 100% !important;
+      grid-row: 1 !important;
+      grid-column: 1 / -1 !important; /* De la primera a la última columna */
       display: flex !important;
-    }
-    
-    /* Grupo de botones de vista estilo "Segmented Control" */
-    .fc-button-group {
+      justify-content: center !important;
       width: 100% !important;
-      display: flex !important;
-      background-color: #f3f4f6; /* Fondo gris claro */
-      padding: 4px;
-      border-radius: 12px;
     }
 
-    .fc-button-group > .fc-button {
-      flex: 1 !important; /* Todos ocupan el mismo ancho */
-      border-radius: 8px !important;
-      margin: 0 !important;
-      font-size: 0.8rem !important;
-      padding: 6px 0 !important;
-      justify-content: center;
-      background: transparent !important;
-      box-shadow: none !important;
+    /* Estilo del título en móvil */
+    .fc-toolbar-title { 
+      font-size: 1.5rem !important; 
+      width: 100%; 
+      text-align: center;
     }
 
-    /* Estado Activo en Móvil (Tarjeta Blanca con Sombra) */
-    .fc-button-group > .fc-button-active {
-      background-color: white !important;
-      color: rgb(var(--color-brand)) !important;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    /* 2. SECCIÓN IZQUIERDA (NAVEGACIÓN) -> Fila 2, Columna 1 */
+    .fc-toolbar-chunk:nth-child(1) {
+      grid-row: 2 !important;
+      grid-column: 1 !important;
+      justify-self: start !important;
     }
 
-    /* Ajustes generales móvil */
-    .fc-timegrid-slot { height: 4.5rem !important; }
-    #calendar-view-container { padding: 1rem 0.5rem !important; }
+    /* 3. SECCIÓN DERECHA (VISTAS) -> Fila 2, Columna 2 */
+    .fc-toolbar-chunk:nth-child(3) {
+      grid-row: 2 !important;
+      grid-column: 2 !important;
+      justify-self: end !important;
+    }
+
+    /* Ajustes generales */
+    #calendar-view-container { padding: 0.5rem !important; }
+    .fc-timegrid-slot { height: 5rem !important; }
+    .fc-today-button { display: none !important; }
   }
 </style>
 
@@ -1022,8 +938,8 @@ const getInitials = (name: string) =>
     </div>
     <!-- CONTENEDOR VISTA CALENDARIO -->
     <div id="calendar-view-container" class="hidden bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[600px] mt-6 relative">
-        <!-- 🔥 NUEVO: Input nativo FIXED (Fuera de flujo pero funcional) -->
-        <input type="date" id="date-navigator" class="fixed bottom-0 left-0 opacity-0 pointer-events-none -z-10 w-0 h-0">
+        <!-- 🔥 NUEVO: Input nativo oculto para el selector de fecha -->
+        <input type="date" id="date-navigator" class="absolute top-5 right-16 opacity-0 z-0 w-8 h-8 cursor-pointer">
         <div id="calendar" class="relative z-10"></div>
     </div>
 </AdminLayout>
@@ -1281,7 +1197,10 @@ const getInitials = (name: string) =>
   }
 
   // ==========================================
-  // 5. INICIALIZAR CALENDARIO (MATERIAL DESIGN V2)
+  // 5. INICIALIZAR CALENDARIO (PREMIUM DEFINITIVO)
+  // ==========================================
+  // ==========================================
+  // 5. INICIALIZAR CALENDARIO
   // ==========================================
   function initCalendar() {
     const calendarEl = document.getElementById('calendar');
@@ -1290,11 +1209,11 @@ const getInitials = (name: string) =>
 
     const getStatusStyle = (status: string) => {
         switch(status) {
-            case 'confirmed': return { border: 'border-brand-500', bg: 'bg-white', text: 'text-gray-800' };
-            case 'pending': return { border: 'border-orange-400', bg: 'bg-white', text: 'text-gray-800' };
-            case 'completed': return { border: 'border-emerald-500', bg: 'bg-white', text: 'text-gray-800' };
-            case 'cancelled': return { border: 'border-red-400', bg: 'bg-white', text: 'text-gray-800' };
-            default: return { border: 'border-gray-400', bg: 'bg-white', text: 'text-gray-800' };
+            case 'confirmed': return { border: 'border-brand-600', bg: 'bg-brand-50', text: 'text-brand-800' };
+            case 'pending': return { border: 'border-orange-400', bg: 'bg-orange-50', text: 'text-orange-800' };
+            case 'completed': return { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-800' };
+            case 'cancelled': return { border: 'border-red-400', bg: 'bg-red-50', text: 'text-red-800' };
+            default: return { border: 'border-gray-400', bg: 'bg-gray-50', text: 'text-gray-800' };
         }
     };
 
@@ -1331,50 +1250,27 @@ const getInitials = (name: string) =>
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
         
-        // 🔥 LAYOUT CONFIG (Se adapta con CSS)
+        // 🔥 HEADER FIJO: 3 Bloques para que el CSS Grid los ubique
         headerToolbar: { 
-            left: 'title', // En móvil esto irá en Fila 1 (Izq)
-            center: '', 
-            right: 'datePickerBtn prev,next today dayGridMonth,timeGridWeek,timeGridDay' // En móvil: Date+Nav (Fila 1 Der), Views (Fila 2)
+            left: 'prev,datePickerBtn,next',  // Bloque 1 (CSS lo pone abajo a la izq)
+            center: 'title',                 // Bloque 2 (CSS lo pone ARRIBA y expandido)
+            right: 'dayGridMonth,timeGridWeek,timeGridDay' // Bloque 3 (CSS lo pone abajo a la der)
         },
         
+        // Formatos de título con nombre completo del mes
         views: {
             dayGridMonth: { titleFormat: { year: 'numeric', month: 'long' } }, 
-            timeGridWeek: { titleFormat: { month: 'short', day: 'numeric' }, dayHeaderFormat: { weekday: 'short', day: 'numeric' } },
+            timeGridWeek: { titleFormat: { year: 'numeric', month: 'short', day: 'numeric' } },
             timeGridDay: { titleFormat: { weekday: 'long', day: 'numeric', month: 'long' } }
         },
         
         customButtons: {
             datePickerBtn: {
                 text: '📅',
-                click: function(mouseEvent: MouseEvent, htmlElement: HTMLElement) {
+                click: function() {
                     if(dateNavigatorInput) {
-                        // 1. VERIFICAR BLOQUEO: Si se acaba de cerrar, no reabrir.
-                        if (dateNavigatorInput.dataset.blockOpen === "true") {
-                            return; 
-                        }
-
-                        // @ts-ignore
-                        const btn = mouseEvent.currentTarget || mouseEvent.target; 
-                        const rect = (btn as HTMLElement).getBoundingClientRect();
-
-                        // 2. Mover el input
-                        dateNavigatorInput.style.position = 'fixed';
-                        dateNavigatorInput.style.top = `${rect.bottom + 5}px`;
-                        dateNavigatorInput.style.left = `${rect.left}px`;
-                        dateNavigatorInput.style.zIndex = '50';
-
-                        // 3. FORZAR FOCO (Vital para que funcione el evento blur luego)
-                        dateNavigatorInput.focus();
-
-                        // 4. ABRIR CON RETRASO (Para evitar race condition visual)
-                        setTimeout(() => {
-                            try {
-                               dateNavigatorInput.showPicker();
-                            } catch(e) {
-                               dateNavigatorInput.click();
-                            }
-                        }, 50);
+                        if(dateNavigatorInput.showPicker) dateNavigatorInput.showPicker();
+                        else dateNavigatorInput.click();
                     }
                 }
             }
@@ -1393,27 +1289,24 @@ const getInitials = (name: string) =>
         selectable: true,
         selectMirror: true,
         
-        // 🎨 RENDERIZADO DE TARJETA (Material Card)
         eventContent: function(arg: any) {
             const props = arg.event.extendedProps;
             let style = getStatusStyle(props.status);
             const timeString = arg.timeText.replace(' - ', '-');
             const isTimeGrid = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
 
-            // Override visual para confirmadas en grilla de tiempo (Color Brand Sólido vs Fondo Blanco)
-            // Si prefieres estilo "Google Calendar moderno", usa fondo blanco con borde izquierdo de color.
-            // Aquí usamos fondo blanco + borde izquierdo grueso + sombra.
+            if (isTimeGrid && props.status === 'confirmed') {
+                style.bg = 'bg-brand-600 shadow-md'; style.text = 'text-white'; style.border = 'border-brand-700';
+            }
             
             return { html: `
-                <div class="h-full w-full rounded-md border-l-[4px] ${style.border} bg-white shadow-sm pl-2 pr-1 py-1 flex flex-col justify-start overflow-hidden hover:shadow-md transition-shadow cursor-move">
-                    <div class="flex items-center gap-1 mb-0.5">
-                         <span class="text-[9px] font-bold text-gray-500">${timeString}</span>
+                <div class="h-full w-full rounded-md border-l-[3px] ${style.border} ${style.bg} pl-2 pr-1 py-1 flex flex-col justify-start overflow-hidden hover:brightness-110 transition-all cursor-move shadow-sm">
+                    <div class="flex items-center justify-between gap-1 mb-0.5">
+                        <span class="text-[9px] font-bold ${style.text} opacity-90">${timeString}</span>
                     </div>
-                    <div class="font-bold text-xs text-gray-900 leading-tight truncate mb-0.5">${arg.event.title}</div>
-                    <div class="text-[10px] text-gray-500 truncate flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> ${props.serviceName}
-                    </div>
-                    ${!isMobile ? `<div class="mt-auto pt-1 flex items-center gap-1 text-[9px] text-gray-400"><span class="truncate">👨‍⚕️ ${props.dentistName}</span></div>` : ''}
+                    <div class="font-bold text-xs ${style.text} leading-tight truncate mb-0.5">${arg.event.title}</div>
+                    <div class="text-[10px] ${style.text} opacity-80 truncate">🦷 ${props.serviceName}</div>
+                    ${!isMobile ? `<div class="mt-auto pt-1 flex items-center gap-1 ${style.text} opacity-80 text-[10px]"><span class="truncate">${props.dentistName}</span></div>` : ''}
                 </div>
             `};
         },
@@ -1515,122 +1408,35 @@ const getInitials = (name: string) =>
 
   document.getElementById("new-appointment-btn")?.addEventListener("click", () => openNewAppointmentModal());
 
-// ACCIONES (EDIT, DELETE, STATUS)
+  // ACCIONES GLOBALES
   document.addEventListener("click", async (e) => {
     // @ts-ignore
-    const btn = e.target.closest('button[data-action]');
+    const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-
     const { id, action } = btn.dataset;
     const ds = btn.dataset;
 
-    if (action === 'view_details') {
-        Swal.fire({
-            title: `📋 Ficha de ${ds.name || "Paciente"}`,
-            html: `
-                <div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
-                    <p><strong>Edad:</strong> ${ds.age || 'N/A'} años</p>
-                    <p><strong>Documento:</strong> ${ds.doc || 'N/A'}</p>
-                    <p><strong>Atendido por:</strong> ${ds.dentist || 'No asignado'}</p>
-                    <p><strong>Motivo:</strong> ${ds.reason || 'Sin especificar'}</p>
-                    <p><strong>Origen:</strong> ${ds.source || 'Desconocido'}</p>
-                </div>`,
-            confirmButtonText: 'Cerrar'
-        });
-        return;
+    if (action === "view_details") {
+      Swal.fire({ title: `📋 Ficha`, html: `<div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg"><p><strong>Edad:</strong> ${ds.age || "N/A"}</p><p><strong>Doc:</strong> ${ds.doc || "N/A"}</p></div>`, confirmButtonText: "Cerrar" }); return;
     }
-
-    if (action === 'edit') {
-        const { value: formValues } = await Swal.fire({
-            title: 'Reprogramar Cita',
-            html: `
-                <div class="flex flex-col gap-4 text-left">
-                    <div><label class="block text-sm">Nueva Fecha</label><input id="swal-date" type="date" class="w-full px-3 py-2 border rounded" value="${ds.date}"></div>
-                    <div><label class="block text-sm">Nueva Hora</label><input id="swal-time" type="time" class="w-full px-3 py-2 border rounded" value="${ds.time}"></div>
-                </div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Guardar',
-            preConfirm: () => [
-                (document.getElementById('swal-date') as HTMLInputElement).value,
-                (document.getElementById('swal-time') as HTMLInputElement).value
-            ]
-        });
-
-        if (formValues) {
-            const [newDate, newTime] = formValues;
-            if (!newDate || !newTime) return;
-            Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
-            const { error } = await supabase.from("appointments").update({ appointment_date: newDate, appointment_time: newTime }).eq("id", id);
-            if (error) Swal.fire('Error', error.message, 'error');
-            else { await Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-        }
-        return;
+    if (action === "edit") {
+      const { value: v } = await Swal.fire({ title: "Reprogramar", html: `<div class="flex gap-2"><input id="sd" type="date" class="border p-2 rounded" value="${ds.date}"><input id="st" type="time" class="border p-2 rounded" value="${ds.time}"></div>`, preConfirm: () => [(document.getElementById("sd") as HTMLInputElement).value, (document.getElementById("st") as HTMLInputElement).value] });
+      if (v) { Swal.fire({title:"...",didOpen:()=>Swal.showLoading()}); const {error}=await supabase.from("appointments").update({appointment_date:v[0],appointment_time:v[1]}).eq("id",id); if(!error) window.location.reload(); } return;
     }
-
-    // ELIMINAR PERMANENTE
-    if (action === 'delete') {
-        const patientName = ds.name || "esta cita";
-        const result = await Swal.fire({
-            title: '⚠️ ELIMINAR PERMANENTEMENTE',
-            html: `
-                <div class="text-left space-y-3">
-                    <p class="text-gray-700">Estás a punto de eliminar la cita de:</p>
-                    <p class="font-bold text-lg text-gray-900">${patientName}</p>
-                    <div class="bg-red-50 border-l-4 border-red-600 p-3 rounded">
-                        <p class="text-sm font-bold text-red-800">⚠️ ESTA ACCIÓN NO SE PUEDE DESHACER</p>
-                        <p class="text-xs text-red-700 mt-1">El registro será eliminado permanentemente de la base de datos.</p>
-                    </div>
-                </div>
-            `,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#DC2626',
-            cancelButtonColor: '#6B7280',
-            confirmButtonText: '🗑️ Sí, eliminar permanentemente',
-            cancelButtonText: 'Cancelar',
-            focusCancel: true,
-            customClass: {
-                confirmButton: 'font-bold',
-                cancelButton: 'font-bold'
-            }
-        });
-
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Eliminando...', didOpen: () => Swal.showLoading() });
-            const { error } = await supabase.from("appointments").delete().eq("id", id);
-            if (error) Swal.fire('Error', error.message, 'error');
-            else { await Swal.fire({ icon: 'success', title: '¡Eliminada!', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-        }
-        return; // Salir después de manejar delete
+    if (action === "delete") {
+      const r = await Swal.fire({ title: "Eliminar?", icon: "warning", showCancelButton: true });
+      if (r.isConfirmed) { Swal.fire({title:"...",didOpen:()=>Swal.showLoading()}); const {error}=await supabase.from("appointments").delete().eq("id",id); if(!error) window.location.reload(); } return;
     }
-
-    const configs: any = {
-        confirm: { title: '¿Confirmar Cita?', text: "El paciente será notificado.", icon: 'question', confirmBtnText: 'Sí, confirmar', confirmBtnColor: '#10B981' },
-        cancel: { title: '¿Cancelar Cita?', text: "Podrás restaurarla después.", icon: 'warning', confirmBtnText: 'Sí, cancelar', confirmBtnColor: '#EF4444' },
-        complete: { title: '¿Finalizar Servicio?', text: "Se marcará como completado.", icon: 'success', confirmBtnText: 'Sí, finalizar', confirmBtnColor: '#3B82F6' },
-        restore: { title: '¿Restaurar Cita?', text: "Volverá al estado Pendiente.", icon: 'info', confirmBtnText: 'Restaurar', confirmBtnColor: '#10B981' },
-        undo_complete: { title: '¿Deshacer?', text: "Volverá al estado Confirmada.", icon: 'question', confirmBtnText: 'Sí, deshacer', confirmBtnColor: '#F59E0B' }
-    };
-
-    const config = configs[action];
-    const result = await Swal.fire({
-        title: config.title, text: config.text, icon: config.icon,
-        showCancelButton: true, confirmButtonColor: config.confirmBtnColor, confirmButtonText: config.confirmBtnText
-    });
-
-    if (result.isConfirmed) {
-        Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
-        const statusMap: any = { confirm: "confirmed", cancel: "cancelled", complete: "completed", restore: "pending", undo_complete: "confirmed" };
-        const { error: upErr } = await supabase.from("appointments").update({ status: statusMap[action] }).eq("id", id);
-        if (upErr) Swal.fire('Error', upErr.message, 'error');
-        else { await Swal.fire({ icon: 'success', title: '¡Listo!', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+    const sm: any = { confirm: "confirmed", cancel: "cancelled", complete: "completed", restore: "pending", undo_complete: "confirmed" };
+    if (sm[action]) {
+       const r = await Swal.fire({ title: "¿Seguro?", icon: "question", showCancelButton: true });
+       if (r.isConfirmed) {
+          Swal.fire({title:"...",didOpen:()=>Swal.showLoading()});
+          const {error}=await supabase.from("appointments").update({status:sm[action]}).eq("id",id);
+          if(!error) window.location.reload();
+       }
     }
   });
 
   setTimeout(() => { applyFilters(); }, 100);
-  
-   dateNavigatorInput?.addEventListener('blur', () => {
-      dateNavigatorInput.dataset.blockOpen = "true";
-      setTimeout(() => { dateNavigatorInput.dataset.blockOpen = "false"; }, 300);
-  });
 </script>
