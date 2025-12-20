@@ -34,6 +34,12 @@ const { data: dentistsList } = await supabase
   .order("name");
 const defaultBusinessId = servicesList?.[0]?.business_id || "";
 
+const { data: businessData } = await supabase
+  .from("businesses")
+  .select("name, primary_color, logo_url, address")
+  .eq("id", defaultBusinessId)
+  .single();
+
 const pending = appointments?.filter((a) => a.status === "pending").length || 0;
 const confirmed =
   appointments?.filter((a) => a.status === "confirmed").length || 0;
@@ -249,8 +255,12 @@ const getInitials = (name: string) =>
     data-dentists={JSON.stringify(dentistsList)}
     data-business-id={defaultBusinessId}
     data-appointments={JSON.stringify(appointments)}
-  >
-  </div>
+    data-business-name={businessData?.name || "Clínica Dental"}
+    data-brand-color={businessData?.primary_color || "#2563EB"}
+    data-logo-url={businessData?.logo_url || ""}
+    data-address={businessData?.address || ""}
+>
+</div>
 
   <div class="max-w-7xl mx-auto">
     <!-- HEADER ESTILO TARJETA -->
@@ -1261,22 +1271,60 @@ const getInitials = (name: string) =>
     });
 
     if (formValues) {
-      Swal.fire({ title: "Guardando...", didOpen: () => Swal.showLoading(), showConfirmButton: false });
-      const { error } = await supabase.from("appointments").insert({
-        business_id: defaultBusinessId,
-        service_id: formValues.service,
-        dentist_id: formValues.dentist || null,
-        customer_name: formValues.name,
-        customer_email: formValues.email || null,
-        customer_phone: formValues.phone,
-        appointment_date: formValues.date,
-        appointment_time: formValues.time,
-        status: "confirmed",
-        patient_doc: formValues.documentId || null,
-        is_first_visit: false
-      });
-      if (error) Swal.fire("Error", error.message, "error"); 
-      else { await Swal.fire({ icon: "success", title: "¡Listo!", timer: 1500, showConfirmButton: false }); window.location.reload(); }
+      Swal.fire({ title: "Procesando...", text: "Creando paciente y enviando confirmación...", didOpen: () => Swal.showLoading(), showConfirmButton: false });
+      
+      // 1. Obtener datos extra del DOM para el correo
+      const appData = document.getElementById("app-data");
+      const serviceName = servicesList.find((s: any) => s.id === formValues.service)?.name || "Consulta";
+      const dentistName = dentistsList.find((d: any) => d.id === formValues.dentist)?.name || "Especialista asignado";
+
+      // 2. LLAMAR AL CEREBRO CENTRAL (API)
+      try {
+          const response = await fetch("/api/appointments/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                  // Datos Cita
+                  business_id: defaultBusinessId,
+                  service_id: formValues.service,
+                  dentist_id: formValues.dentist || null,
+                  customer_name: formValues.name,
+                  customer_email: formValues.email || null,
+                  customer_phone: formValues.phone,
+                  appointment_date: formValues.date,
+                  appointment_time: formValues.time,
+                  patient_doc: formValues.documentId || null,
+                  patient_age: formValues.age ? parseInt(formValues.age) : null,
+                  marketing_source: formValues.source,
+                  is_first_visit: false, // Asumimos false si lo crea el admin, o podrías agregar un checkbox en el modal
+                  
+                  // Datos para el Email (Leídos del dataset que agregamos arriba)
+                  business_name: appData?.dataset.businessName,
+                  brand_color: appData?.dataset.brandColor,
+                  logo_url: appData?.dataset.logoUrl,
+                  business_address: appData?.dataset.address,
+                  service_name: serviceName,
+                  dentist_name: dentistName
+              })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) throw new Error(result.error || "Error al procesar la cita");
+
+          await Swal.fire({ 
+              icon: "success", 
+              title: "¡Cita Agendada!", 
+              text: "Se ha enviado el correo de confirmación al paciente.",
+              timer: 2000, 
+              showConfirmButton: false 
+          }); 
+          window.location.reload();
+
+      } catch (err: any) {
+          console.error(err);
+          Swal.fire("Error", err.message, "error");
+      }
     }
   }
 
@@ -1628,7 +1676,6 @@ const getInitials = (name: string) =>
   });
 
   setTimeout(() => { applyFilters(); }, 100);
-  
    dateNavigatorInput?.addEventListener('blur', () => {
       dateNavigatorInput.dataset.blockOpen = "true";
       setTimeout(() => { dateNavigatorInput.dataset.blockOpen = "false"; }, 300);
