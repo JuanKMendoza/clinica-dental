@@ -743,6 +743,7 @@ const getInitials = (name: string) =>
                               title="Ver Ficha"
                               data-id={apt.id}
                               data-action="view_details"
+                              data-patient-id={apt.patient_id} 
                               data-name={apt.customer_name}
                               data-age={apt.patient_age}
                               data-doc={apt.patient_doc}
@@ -1594,21 +1595,17 @@ const getInitials = (name: string) =>
     const ds = btn.dataset;
 
     if (action === 'view_details') {
-        Swal.fire({
-            title: `📋 Ficha de ${ds.name || "Paciente"}`,
-            html: `
-                <div class="text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
-                    <p><strong>Edad:</strong> ${ds.age || 'N/A'} años</p>
-                    <p><strong>Documento:</strong> ${ds.doc || 'N/A'}</p>
-                    <p><strong>Atendido por:</strong> ${ds.dentist || 'No asignado'}</p>
-                    <p><strong>Motivo:</strong> ${ds.reason || 'Sin especificar'}</p>
-                    <p><strong>Origen:</strong> ${ds.source || 'Desconocido'}</p>
-                </div>`,
-            confirmButtonText: 'Cerrar'
-        });
+        const patientId = ds.patientId; // Leemos el ID que pusimos en el HTML
+
+        if (patientId && patientId !== "null" && patientId !== "undefined") {
+            // ✅ NAVEGACIÓN DIRECTA AL PERFIL
+            window.location.href = `/admin/pacientes/${patientId}`;
+        } else {
+            // Fallback: Si es una cita antigua sin paciente migrado, usamos el buscador
+            window.location.href = `/admin/pacientes?q=${ds.doc || ds.name}`;
+        }
         return;
     }
-
     if (action === 'edit') {
         const { value: formValues } = await Swal.fire({
             title: 'Reprogramar Cita',

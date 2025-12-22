@@ -1,6 +1,12 @@
 //////
 
 Color predeterminado: 2563eb
+001427 Gris
+
+git
+Fases experimentales
+git checkout -b 
+git checkout -b experiment/historia-clinica
 
 //-Query resumen de tablas-//
 SELECT
