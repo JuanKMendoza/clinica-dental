@@ -16,20 +16,20 @@ if (accessToken && refreshToken) {
 
 if (!id) return Astro.redirect("/admin/pacientes");
 
-// 2. DATOS
+// 2. DATOS DEL PACIENTE
 const { data: patient, error: patientError } = await supabase.from("patients").select("*").eq("id", id).single();
 if (patientError || !patient) return Astro.redirect("/404");
 
+// 3. DATOS RELACIONADOS
+// Records: Traemos todo para pasarlo al cliente y que JS haga la magia de filtrado/paginación
 const { data: records } = await supabase.from("clinical_records").select(`*, dentists (name)`).eq("patient_id", id).order("created_at", { ascending: false });
 const { data: appointments } = await supabase.from("appointments").select(`*, services (name), dentists (name)`).eq("patient_id", id).order("appointment_date", { ascending: false });
 const { data: attachments } = await supabase.from("patient_attachments").select("*").eq("patient_id", id).order("created_at", { ascending: false });
-const { data: dentistsList } = await supabase
-  .from("dentists")
-  .select("id, name")
-  .eq("business_id", patient.business_id)
-  .eq("is_active", true)
-  .order("name");
-  
+
+// 🔥 NUEVO: Necesitamos Servicios y Dentistas para el Modal de "Agendar Ahora" y Filtros
+const { data: servicesList } = await supabase.from("services").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
+const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
+
 // Helpers
 const getInitials = (name: string) => name ? name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() : "??";
 const calculateAge = (birthDateString: string) => {
@@ -62,7 +62,7 @@ const age = calculateAge(patient.birth_date);
                     <span class="flex items-center gap-1"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>{age !== null ? `${age} años` : 'Edad desconocida'}</span>
                     <span class="flex items-center gap-1"><svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>{patient.phone || 'Sin teléfono'}</span>
                 </div>
-                <!-- ALERGIAS DESTACADAS -->
+                <!-- ALERGIAS -->
                 {patient.allergies && (
                     <div class="mt-2 inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 text-xs font-bold rounded border border-red-100 animate-pulse">
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -84,8 +84,10 @@ const age = calculateAge(patient.birth_date);
 
     <!-- GRID -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- SIDEBAR -->
+        
+        <!-- COLUMNA IZQUIERDA -->
         <div class="space-y-6">
+            <!-- Tabs -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-2">
                 <nav class="flex lg:flex-col gap-1 overflow-x-auto whitespace-nowrap pb-2 lg:pb-0 scrollbar-hide">
                     <button class="tab-btn active flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-history">
@@ -100,6 +102,7 @@ const age = calculateAge(patient.birth_date);
                 </nav>
             </div>
             
+            <!-- Citas (Con botón Quick Booking) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                 <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Próximas Citas</h3>
                 <div class="space-y-3">
@@ -110,62 +113,69 @@ const age = calculateAge(patient.birth_date);
                                 <div><p class="text-sm font-bold text-gray-900">{a.services?.name}</p><p class="text-xs text-gray-500">🕒 {a.appointment_time.slice(0,5)} - Dr. {a.dentists?.name?.split(' ')[0]}</p></div>
                             </div>
                         ))
-                    ) : (<div class="text-center py-4"><p class="text-sm text-gray-400">No hay citas futuras</p><a href="/admin/citas" class="text-xs text-brand-600 font-bold hover:underline">Agendar ahora</a></div>)}
+                    ) : (
+                        <div class="text-center py-4">
+                            <p class="text-sm text-gray-400">No hay citas futuras</p>
+                            <!-- 🔥 BUTTON: AGENDAR AHORA -->
+                            <button id="quick-book-btn" class="text-xs text-brand-600 font-bold hover:underline cursor-pointer">Agendar ahora</button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <div class="pt-4"><button id="delete-patient-btn" class="w-full flex items-center justify-center gap-2 p-3 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-sm font-bold transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>Eliminar Paciente</button></div>
         </div>
 
-        <!-- CONTENIDO -->
+        <!-- CONTENIDO CENTRAL -->
         <div class="lg:col-span-2">
             
             <div id="tab-history" class="tab-content block space-y-6">
-                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <div>
-                        <h2 class="font-bold text-gray-800">Evoluciones</h2>
-                        <!-- Botón Exportar Historial -->
-                        <button id="export-history-btn" class="text-xs text-brand-600 hover:underline flex items-center gap-1 mt-1">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> 
-                            Descargar Historial
-                        </button>
+                
+                <!-- HEADER FILTROS -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="font-bold text-gray-800">Evoluciones Médicas</h2>
+                            <button id="export-history-btn" class="text-xs text-brand-600 hover:underline flex items-center gap-1 mt-1">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> 
+                                Excel
+                            </button>
+                        </div>
+                        <button id="add-evolution-btn" class="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md shadow-brand-200 hover:bg-brand-700 transition-all flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>Agregar Nota</button>
                     </div>
-                    <button id="add-evolution-btn" class="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md shadow-brand-200 hover:bg-brand-700 transition-all flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>Agregar Nota</button>
+                    
+                    <!-- 🔥 BUSCADOR Y FILTROS INTERACTIVOS -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-gray-100">
+                        <input id="search-notes" type="text" placeholder="Buscar palabras clave..." class="w-full text-xs border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-brand-500">
+                        <select id="filter-type" class="w-full text-xs border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-brand-500">
+                            <option value="all">Todos los Tipos</option>
+                            <option value="Evolución">Evolución</option>
+                            <option value="Anamnesis">Anamnesis</option>
+                            <option value="Diagnóstico">Diagnóstico</option>
+                            <option value="Procedimiento">Procedimiento</option>
+                            <option value="Prescripción">Prescripción</option>
+                        </select>
+                        <select id="filter-doctor" class="w-full text-xs border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-brand-500">
+                            <option value="all">Todos los Doctores</option>
+                            <!-- Se llena con JS -->
+                        </select>
+                    </div>
                 </div>
                 
-                <!-- JSON OCULTO PARA EXPORTACIÓN -->
-                <div id="history-json" class="hidden" data-json={JSON.stringify(records)}></div>
-
-                <div class="relative pl-8 border-l-2 border-gray-200 space-y-8">
-                    {records && records.length > 0 ? (
-                        records.map(r => (
-                            <div class="relative group">
-                                <div class="absolute -left-[39px] top-1 w-5 h-5 rounded-full border-4 border-white bg-brand-500 shadow-sm"></div>
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow relative group/card">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 mb-1">{r.record_type}</span>
-                                            <h4 class="font-bold text-gray-900 text-sm">Atendido por: {r.dentists?.name || 'Clínica'}</h4>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-xs text-gray-400 font-mono">{new Date(r.created_at).toLocaleDateString('es-CO', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
-                                            <!-- ACCIONES NOTA -->
-                                            <div class="hidden group-hover/card:flex gap-1 ml-2">
-                                                <button class="text-gray-400 hover:text-brand-600 p-1 edit-record-btn" data-id={r.id} data-content={r.description} title="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                                                <button class="text-gray-400 hover:text-red-600 p-1 delete-record-btn" data-id={r.id} title="Borrar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{r.description}</div>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div class="text-center py-10 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
-                            <p class="text-gray-400">Aún no hay notas clínicas registradas.</p>
-                        </div>
-                    )}
+                <!-- TIMELINE CONTAINER -->
+                <div id="timeline-container" class="relative pl-8 border-l-2 border-gray-200 space-y-8 min-h-[200px]">
+                    <!-- Aquí se renderizan las notas vía JS -->
                 </div>
+
+                <!-- PAGINACIÓN TIMELINE -->
+                <div id="timeline-pagination" class="flex justify-between items-center text-xs text-gray-500 pt-4 border-t border-gray-100 hidden">
+                    <span id="timeline-info">Mostrando 0-0 de 0</span>
+                    <div class="flex gap-2">
+                        <button id="tl-prev" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+                        <button id="tl-next" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
+                    </div>
+                </div>
+
             </div>
 
             <div id="tab-info" class="tab-content hidden bg-white rounded-xl shadow-sm border border-gray-100 p-8">
@@ -184,16 +194,8 @@ const age = calculateAge(patient.birth_date);
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
                     <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg></div>
                     <h3 class="font-bold text-gray-900">Archivos y Radiografías</h3>
-                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 my-4 text-left">
-                        <p class="text-xs text-blue-800 font-bold mb-1">ℹ️ Información de Almacenamiento:</p>
-                        <ul class="text-xs text-blue-600 list-disc list-inside space-y-1">
-                            <li>Formatos permitidos: JPG, PNG, PDF.</li>
-                            <li>Peso máximo: 5MB por archivo.</li>
-                            <li>Los archivos se guardan en la nube segura (Supabase Storage).</li>
-                            <li>Quedan vinculados a este paciente permanentemente.</li>
-                        </ul>
-                    </div>
-                    <button onclick="Swal.fire('Próximamente', 'Módulo de carga de archivos en construcción (Fase 4)', 'info')" class="bg-gray-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors">Subir Archivo</button>
+                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 my-4 text-left"><p class="text-xs text-blue-800 font-bold mb-1">ℹ️ Información:</p><ul class="text-xs text-blue-600 list-disc list-inside space-y-1"><li>Formatos permitidos: JPG, PNG, PDF.</li><li>Peso máximo: 5MB.</li></ul></div>
+                    <button onclick="Swal.fire('Próximamente', 'Módulo de carga en Fase 4', 'info')" class="bg-gray-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-black transition-colors">Subir Archivo</button>
                 </div>
             </div>
 
@@ -201,12 +203,17 @@ const age = calculateAge(patient.birth_date);
     </div>
   </div>
 
+  <!-- DATOS JSON OCULTOS PARA JS (Fuente de Verdad) -->
   <div 
-  id="page-data" 
-  data-patient-id={id} 
-  data-business-id={patient.business_id}
-  data-dentists={JSON.stringify(dentistsList)}
-></div>
+    id="page-data" 
+    data-patient-id={id} 
+    data-business-id={patient.business_id}
+    data-dentists={JSON.stringify(dentistsList)}
+    data-services={JSON.stringify(servicesList)}
+    data-records={JSON.stringify(records)}
+    data-patient-info={JSON.stringify({name: patient.full_name, doc: patient.document_id, phone: patient.phone, email: patient.email})}
+    data-branding={JSON.stringify({name: "Clínica", color: "#2563EB", logo: ""})} 
+  ></div>
 
 </AdminLayout>
 
@@ -214,217 +221,306 @@ const age = calculateAge(patient.birth_date);
   import Swal from "sweetalert2";
   import { supabase } from "../../../lib/supabase";
 
-  // ==========================================
-  // 1. VARIABLES GLOBALES (Declaradas UNA sola vez)
-  // ==========================================
+  // DATOS GLOBALES
   const pageData = document.getElementById('page-data');
   const patientId = pageData?.dataset.patientId;
   const businessId = pageData?.dataset.businessId;
-  // Leemos los dentistas para el modal (NUEVO)
   const dentists = JSON.parse(pageData?.dataset.dentists || '[]');
+  const services = JSON.parse(pageData?.dataset.services || '[]');
+  const records = JSON.parse(pageData?.dataset.records || '[]'); // Todos los registros
+  const patientInfo = JSON.parse(pageData?.dataset.patientInfo || '{}');
 
-  // ==========================================
-  // 2. LÓGICA DE TABS
-  // ==========================================
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
-
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Reset styles
-        tabBtns.forEach(b => { 
-            b.classList.remove('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600'); 
-            b.classList.add('text-gray-600'); 
-        });
-        tabContents.forEach(c => c.classList.add('hidden'));
-
-        // Activate clicked
-        const targetId = (btn as HTMLElement).dataset.target;
-        const targetContent = document.getElementById(targetId || '');
-        
-        btn.classList.remove('text-gray-600');
-        btn.classList.add('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600');
-        targetContent?.classList.remove('hidden');
-        targetContent?.classList.add('animate-fade-in');
-    });
+  // Llenar filtro de doctores
+  const doctorFilter = document.getElementById('filter-doctor') as HTMLSelectElement;
+  dentists.forEach((d: any) => {
+      const opt = document.createElement('option');
+      opt.value = d.name; // Filtramos por nombre para simplificar visualización
+      opt.textContent = d.name;
+      doctorFilter.appendChild(opt);
   });
-  // Activar primera tab por defecto
-  (tabBtns[0] as HTMLElement).click();
 
   // ==========================================
-  // 3. CREAR NOTA (NUEVA LÓGICA CON SELECTS)
+  // LÓGICA DEL TIMELINE (Render + Filtros + Paginación)
   // ==========================================
+  const timelineContainer = document.getElementById('timeline-container');
+  const searchNotes = document.getElementById('search-notes') as HTMLInputElement;
+  const filterType = document.getElementById('filter-type') as HTMLSelectElement;
+  const tlPagination = document.getElementById('timeline-pagination');
+  
+  let tlCurrentPage = 1;
+  const tlItemsPerPage = 5; // Paginación corta para notas
+  let filteredRecords = [...records];
+
+  function renderTimeline() {
+      if(!timelineContainer) return;
+      timelineContainer.innerHTML = '';
+
+      if (filteredRecords.length === 0) {
+          timelineContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200"><p class="text-gray-400">No se encontraron notas.</p></div>`;
+          if (tlPagination) tlPagination.style.display = 'none';
+          return;
+      }
+
+      // Paginación
+      const start = (tlCurrentPage - 1) * tlItemsPerPage;
+      const end = start + tlItemsPerPage;
+      const pageSlice = filteredRecords.slice(start, end);
+
+      pageSlice.forEach((r: any) => {
+          const div = document.createElement('div');
+          div.className = 'relative group';
+          div.innerHTML = `
+            <div class="absolute -left-[39px] top-1 w-5 h-5 rounded-full border-4 border-white bg-brand-500 shadow-sm"></div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow relative group/card">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 mb-1">${r.record_type}</span>
+                        <h4 class="font-bold text-gray-900 text-sm">Atendido por: ${r.dentists?.name || 'Clínica'}</h4>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-400 font-mono">${new Date(r.created_at).toLocaleDateString('es-CO', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
+                        <div class="hidden group-hover/card:flex gap-1 ml-2">
+                            <button class="text-gray-400 hover:text-brand-600 p-1 edit-record-btn" data-id="${r.id}" title="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                            <button class="text-gray-400 hover:text-red-600 p-1 delete-record-btn" data-id="${r.id}" title="Borrar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap note-content">${r.description}</div>
+            </div>
+          `;
+          
+          // Listeners dinámicos para editar/borrar
+          div.querySelector('.edit-record-btn')?.addEventListener('click', () => editRecord(r));
+          div.querySelector('.delete-record-btn')?.addEventListener('click', () => deleteRecord(r.id));
+          
+          timelineContainer.appendChild(div);
+      });
+
+      // Update controles
+      if (tlPagination) {
+          tlPagination.style.display = filteredRecords.length > tlItemsPerPage ? 'flex' : 'none';
+          document.getElementById('timeline-info')!.textContent = `Mostrando ${start+1}-${Math.min(end, filteredRecords.length)} de ${filteredRecords.length}`;
+          (document.getElementById('tl-prev') as HTMLButtonElement).disabled = tlCurrentPage === 1;
+          (document.getElementById('tl-next') as HTMLButtonElement).disabled = end >= filteredRecords.length;
+      }
+  }
+
+  function applyFilters() {
+      const q = searchNotes.value.toLowerCase();
+      const type = filterType.value;
+      const doc = doctorFilter.value;
+
+      filteredRecords = records.filter((r: any) => {
+          const matchText = r.description.toLowerCase().includes(q) || r.record_type.toLowerCase().includes(q);
+          const matchType = type === 'all' || r.record_type === type;
+          const matchDoc = doc === 'all' || (r.dentists?.name === doc);
+          return matchText && matchType && matchDoc;
+      });
+      
+      tlCurrentPage = 1;
+      renderTimeline();
+  }
+
+  searchNotes?.addEventListener('keyup', applyFilters);
+  filterType?.addEventListener('change', applyFilters);
+  doctorFilter?.addEventListener('change', applyFilters);
+  
+  document.getElementById('tl-prev')?.addEventListener('click', () => { if(tlCurrentPage > 1) { tlCurrentPage--; renderTimeline(); }});
+  document.getElementById('tl-next')?.addEventListener('click', () => { if((tlCurrentPage * tlItemsPerPage) < filteredRecords.length) { tlCurrentPage++; renderTimeline(); }});
+
+  // Render inicial
+  renderTimeline();
+
+
+  // ==========================================
+  // AGENDAMIENTO RÁPIDO (Quick Book)
+  // ==========================================
+  document.getElementById('quick-book-btn')?.addEventListener('click', async () => {
+      let dentistOptions = '<option value="">Cualquiera</option>';
+      dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+      let serviceOptions = '<option value="">Selecciona...</option>';
+      services.forEach((s: any) => serviceOptions += `<option value="${s.id}">${s.name}</option>`);
+
+      const { value: formValues } = await Swal.fire({
+          title: `Cita para ${patientInfo.name}`,
+          html: `
+            <div class="flex flex-col gap-3 text-left">
+                <div><label class="text-xs font-bold text-gray-500 uppercase">Servicio *</label><select id="qb-service" class="swal2-input m-0 w-full text-sm">${serviceOptions}</select></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold text-gray-500 uppercase">Fecha *</label><input id="qb-date" type="date" class="swal2-input m-0 w-full text-sm"></div>
+                    <div><label class="text-xs font-bold text-gray-500 uppercase">Hora *</label><input id="qb-time" type="time" class="swal2-input m-0 w-full text-sm"></div>
+                </div>
+                <div><label class="text-xs font-bold text-gray-500 uppercase">Doctor</label><select id="qb-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div>
+            </div>
+          `,
+          showCancelButton: true, confirmButtonText: 'Agendar', confirmButtonColor: 'rgb(var(--color-brand))',
+          preConfirm: () => {
+              const service = (document.getElementById('qb-service') as HTMLSelectElement).value;
+              const date = (document.getElementById('qb-date') as HTMLInputElement).value;
+              const time = (document.getElementById('qb-time') as HTMLInputElement).value;
+              const dentist = (document.getElementById('qb-dentist') as HTMLSelectElement).value;
+              if(!service || !date || !time) Swal.showValidationMessage('Faltan datos obligatorios');
+              return { service, date, time, dentist };
+          }
+      });
+
+      if (formValues) {
+          Swal.fire({ title: 'Agendando...', didOpen: () => Swal.showLoading() });
+          
+          try {
+              // Buscar nombres para el email
+              const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio";
+              const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Asignado";
+
+              const response = await fetch("/api/appointments/create", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                      business_id: businessId,
+                      service_id: formValues.service,
+                      dentist_id: formValues.dentist || null,
+                      customer_name: patientInfo.name,
+                      customer_email: patientInfo.email,
+                      customer_phone: patientInfo.phone,
+                      patient_doc: patientInfo.doc, // Clave para vincular
+                      appointment_date: formValues.date,
+                      appointment_time: formValues.time,
+                      status: "confirmed", // Como lo hace el admin, confirmamos de una
+                      is_first_visit: false,
+                      marketing_source: "Admin Panel (Ficha)",
+                      // Datos Email
+                      service_name: serviceName,
+                      dentist_name: dentistName
+                  })
+              });
+              
+              const result = await response.json();
+              if(!response.ok) throw new Error(result.error);
+
+              await Swal.fire({ icon: 'success', title: 'Cita Agendada', timer: 1500, showConfirmButton: false });
+              window.location.reload(); // Recargar para verla en la lista lateral
+
+          } catch (e: any) {
+              Swal.fire('Error', e.message, 'error');
+          }
+      }
+  });
+
+  // ==========================================
+  // FUNCIONES CRUD NOTAS (Llamadas desde renderTimeline)
+  // ==========================================
+  async function editRecord(r: any) {
+      const { value: text } = await Swal.fire({
+        input: 'textarea', inputValue: r.description, inputLabel: 'Editar Nota', showCancelButton: true, confirmButtonText: 'Actualizar', confirmButtonColor: 'rgb(var(--color-brand))', customClass: { input: 'h-32 text-sm' }
+      });
+      if (text) {
+        Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
+        const { error } = await supabase.from('clinical_records').update({ description: text }).eq('id', r.id);
+        if (error) Swal.fire('Error', error.message, 'error');
+        else { 
+            // Actualizar localmente para no recargar toda la pagina
+            const idx = records.findIndex((rec:any) => rec.id === r.id);
+            if(idx !== -1) records[idx].description = text;
+            applyFilters(); // Re-render
+            Swal.close();
+        }
+      }
+  }
+
+  async function deleteRecord(id: string) {
+      const result = await Swal.fire({ title: '¿Borrar nota?', text: "No se puede deshacer.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
+      if(result.isConfirmed) {
+         Swal.fire({ title: 'Borrando...', didOpen: () => Swal.showLoading() });
+         const { error } = await supabase.from('clinical_records').delete().eq('id', id);
+         if (error) Swal.fire('Error', error.message, 'error');
+         else { 
+             const idx = records.findIndex((rec:any) => rec.id === id);
+             if(idx !== -1) records.splice(idx, 1);
+             applyFilters();
+             Swal.close();
+         }
+      }
+  }
+
+  // CREAR NOTA (Igual que antes pero refrescando localmente)
   document.getElementById('add-evolution-btn')?.addEventListener('click', async () => {
-    
-    // Generar opciones de dentistas HTML dinámicamente
-    let dentistOptions = '<option value="">-- Seleccionar Profesional --</option>';
-    dentists.forEach((d: any) => {
-        dentistOptions += `<option value="${d.id}">${d.name}</option>`;
-    });
+    let dentistOptions = '<option value="">-- Seleccionar --</option>';
+    dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
 
     const { value: formValues } = await Swal.fire({
-        title: 'Nueva Nota Clínica',
-        html: `
-            <div class="flex flex-col gap-3 text-left">
-                <!-- TIPO -->
-                <div>
-                    <label class="text-xs font-bold text-gray-500 uppercase">Tipo de Registro</label>
-                    <select id="note-type" class="swal2-input m-0 w-full text-sm">
-                        <option value="Evolución">Evolución (General)</option>
-                        <option value="Anamnesis">Anamnesis (Historia Inicial)</option>
-                        <option value="Diagnóstico">Diagnóstico</option>
-                        <option value="Procedimiento">Procedimiento Realizado</option>
-                        <option value="Prescripción">Receta / Medicamentos</option>
-                    </select>
-                </div>
-                <!-- DENTISTA -->
-                <div>
-                    <label class="text-xs font-bold text-gray-500 uppercase">Profesional Responsable</label>
-                    <select id="note-dentist" class="swal2-input m-0 w-full text-sm">
-                        ${dentistOptions}
-                    </select>
-                </div>
-                <!-- TEXTO -->
-                <div>
-                    <label class="text-xs font-bold text-gray-500 uppercase">Detalle de la nota</label>
-                    <textarea id="note-text" class="swal2-textarea m-0 w-full h-32 text-sm border-gray-300 focus:border-brand-500 focus:ring-brand-500" placeholder="Escribe los detalles..."></textarea>
-                </div>
-            </div>
-        `,
-        width: '600px',
-        showCancelButton: true,
-        confirmButtonText: 'Guardar Nota',
-        confirmButtonColor: 'rgb(var(--color-brand))',
-        cancelButtonText: 'Cancelar',
-        preConfirm: () => {
-            const type = (document.getElementById('note-type') as HTMLSelectElement).value;
-            const dentist = (document.getElementById('note-dentist') as HTMLSelectElement).value;
-            const text = (document.getElementById('note-text') as HTMLTextAreaElement).value;
-
-            if (!dentist) Swal.showValidationMessage('Debes seleccionar el profesional');
-            if (!text) Swal.showValidationMessage('La nota no puede estar vacía');
-
-            return { type, dentist, text };
-        }
+        title: 'Nueva Nota',
+        html: `<div class="flex flex-col gap-3 text-left"><div><label class="text-xs font-bold text-gray-500 uppercase">Tipo</label><select id="note-type" class="swal2-input m-0 w-full text-sm"><option value="Evolución">Evolución</option><option value="Anamnesis">Anamnesis</option><option value="Diagnóstico">Diagnóstico</option><option value="Procedimiento">Procedimiento</option><option value="Prescripción">Receta</option></select></div><div><label class="text-xs font-bold text-gray-500 uppercase">Doctor</label><select id="note-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div><div><label class="text-xs font-bold text-gray-500 uppercase">Detalle</label><textarea id="note-text" class="swal2-textarea m-0 w-full h-32 text-sm" placeholder="Escribe..."></textarea></div></div>`,
+        showCancelButton: true, confirmButtonText: 'Guardar', confirmButtonColor: 'rgb(var(--color-brand))',
+        preConfirm: () => ({ type: (document.getElementById('note-type') as HTMLSelectElement).value, dentist: (document.getElementById('note-dentist') as HTMLSelectElement).value, text: (document.getElementById('note-text') as HTMLTextAreaElement).value })
     });
 
     if (formValues) {
+        if(!formValues.dentist || !formValues.text) return Swal.fire('Error', 'Faltan datos', 'warning');
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
-        const { error } = await supabase.from('clinical_records').insert({
-            business_id: businessId,
-            patient_id: patientId,
-            dentist_id: formValues.dentist,
-            record_type: formValues.type,
-            description: formValues.text,
-        });
+        
+        // Insertamos y devolvemos el registro completo para inyectarlo en el timeline sin reload
+        const { data, error } = await supabase.from('clinical_records').insert({
+            business_id: businessId, patient_id: patientId, dentist_id: formValues.dentist, record_type: formValues.type, description: formValues.text
+        }).select(`*, dentists(name)`).single();
 
         if (error) Swal.fire('Error', error.message, 'error');
-        else { await Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+        else { 
+            records.unshift(data); // Agregar al inicio
+            applyFilters();
+            Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false });
+        }
     }
   });
 
-  // ==========================================
-  // 4. EDITAR NOTA EXISTENTE
-  // ==========================================
-  document.querySelectorAll('.edit-record-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-          const id = (btn as HTMLElement).dataset.id;
-          const currentText = (btn as HTMLElement).dataset.content;
-          
-          const { value: text } = await Swal.fire({
-            input: 'textarea', 
-            inputValue: currentText, 
-            inputLabel: 'Editar contenido de la nota', 
-            showCancelButton: true, 
-            confirmButtonText: 'Actualizar', 
-            confirmButtonColor: 'rgb(var(--color-brand))', 
-            customClass: { input: 'h-32 text-sm' }
-          });
-
-          if (text) {
-            Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
-            const { error } = await supabase.from('clinical_records').update({ description: text }).eq('id', id);
-            if (error) Swal.fire('Error', error.message, 'error');
-            else { await Swal.fire({ icon: 'success', title: 'Nota actualizada', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-          }
-      });
+  // TABS LOGIC
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        tabBtns.forEach(b => { b.classList.remove('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600'); b.classList.add('text-gray-600'); });
+        tabContents.forEach(c => c.classList.add('hidden'));
+        const targetId = (btn as HTMLElement).dataset.target;
+        document.getElementById(targetId || '')?.classList.remove('hidden');
+        btn.classList.remove('text-gray-600');
+        btn.classList.add('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600');
+    });
   });
+  (tabBtns[0] as HTMLElement).click();
 
-  // ==========================================
-  // 5. BORRAR NOTA
-  // ==========================================
-  document.querySelectorAll('.delete-record-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-          const id = (btn as HTMLElement).dataset.id;
-          const result = await Swal.fire({ title: '¿Borrar nota?', text: "No se puede deshacer.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
-          if(result.isConfirmed) {
-             Swal.fire({ title: 'Borrando...', didOpen: () => Swal.showLoading() });
-             const { error } = await supabase.from('clinical_records').delete().eq('id', id);
-             if (error) Swal.fire('Error', error.message, 'error');
-             else { await Swal.fire({ icon: 'success', title: 'Borrado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
-          }
-      });
-  });
-
-  // ==========================================
-  // 6. EXPORTAR HISTORIAL
-  // ==========================================
+  // EXPORT, EDIT PATIENT, DELETE PATIENT (Misma lógica anterior...)
   document.getElementById('export-history-btn')?.addEventListener('click', () => {
-      const historyJson = document.getElementById('history-json'); // Asegúrate que este elemento exista en el HTML que te di
-      if (!historyJson) return;
-      
-      const records = JSON.parse(historyJson.dataset.json || '[]');
-      
       let csv = "Fecha;Tipo;Doctor;Nota\n";
       records.forEach((r: any) => {
           const clean = (str: any) => (str || "").toString().replace(/"/g, '""').replace(/;/g, ',');
           csv += `${new Date(r.created_at).toLocaleDateString()};${clean(r.record_type)};${clean(r.dentists?.name)};"${clean(r.description)}"\n`;
       });
-
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `historia_${patientId}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const a = document.createElement("a"); a.href = url; a.download = `historia_${patientId}.csv`; a.click();
   });
 
-  // ==========================================
-  // 7. EDITAR PACIENTE (Datos Personales)
-  // ==========================================
   const editBtn = document.getElementById('edit-patient-btn');
   editBtn?.addEventListener('click', async () => {
     const ds = (editBtn as HTMLElement).dataset;
     const { value: formValues } = await Swal.fire({
         title: 'Editar Información',
-        html: `<div class="grid grid-cols-1 gap-3 text-left"><div><label class="text-xs font-bold text-gray-500">Nombre</label><input id="edit-name" class="swal2-input m-0 w-full" value="${ds.fullName || ''}"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Doc</label><input id="edit-doc" class="swal2-input m-0 w-full" value="${ds.doc || ''}"></div><div><label class="text-xs font-bold text-gray-500">Nacimiento</label><input id="edit-birth" type="date" class="swal2-input m-0 w-full" value="${ds.birth || ''}"></div></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Teléfono</label><input id="edit-phone" class="swal2-input m-0 w-full" value="${ds.phone || ''}"></div><div><label class="text-xs font-bold text-gray-500">Género</label><select id="edit-gender" class="swal2-input m-0 w-full"><option value="masculino" ${ds.gender === 'masculino'?'selected':''}>Masculino</option><option value="femenino" ${ds.gender === 'femenino'?'selected':''}>Femenino</option><option value="otro" ${ds.gender === 'otro'?'selected':''}>Otro</option></select></div></div><div><label class="text-xs font-bold text-gray-500">Email</label><input id="edit-email" class="swal2-input m-0 w-full" value="${ds.email || ''}"></div><div><label class="text-xs font-bold text-gray-500">Dirección</label><input id="edit-address" class="swal2-input m-0 w-full" value="${ds.address || ''}"></div><div><label class="text-xs font-bold text-red-500">Alergias (Importante)</label><input id="edit-allergies" class="swal2-input m-0 w-full border-red-200 focus:border-red-500" value="${ds.allergies || ''}" placeholder="Ej: Penicilina, Latex..."></div></div>`,
+        html: `<div class="grid grid-cols-1 gap-3 text-left"><div><label class="text-xs font-bold text-gray-500">Nombre</label><input id="edit-name" class="swal2-input m-0 w-full" value="${ds.fullName || ''}"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Doc</label><input id="edit-doc" class="swal2-input m-0 w-full" value="${ds.doc || ''}"></div><div><label class="text-xs font-bold text-gray-500">Nacimiento</label><input id="edit-birth" type="date" class="swal2-input m-0 w-full" value="${ds.birth || ''}"></div></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Teléfono</label><input id="edit-phone" class="swal2-input m-0 w-full" value="${ds.phone || ''}"></div><div><label class="text-xs font-bold text-gray-500">Género</label><select id="edit-gender" class="swal2-input m-0 w-full"><option value="masculino" ${ds.gender === 'masculino'?'selected':''}>Masculino</option><option value="femenino" ${ds.gender === 'femenino'?'selected':''}>Femenino</option><option value="otro" ${ds.gender === 'otro'?'selected':''}>Otro</option></select></div></div><div><label class="text-xs font-bold text-gray-500">Email</label><input id="edit-email" class="swal2-input m-0 w-full" value="${ds.email || ''}"></div><div><label class="text-xs font-bold text-gray-500">Dirección</label><input id="edit-address" class="swal2-input m-0 w-full" value="${ds.address || ''}"></div><div><label class="text-xs font-bold text-red-500">Alergias</label><input id="edit-allergies" class="swal2-input m-0 w-full border-red-200" value="${ds.allergies || ''}"></div></div>`,
         showCancelButton: true, confirmButtonText: 'Guardar', confirmButtonColor: 'rgb(var(--color-brand))',
         preConfirm: () => ({ full_name: (document.getElementById('edit-name') as HTMLInputElement).value, document_id: (document.getElementById('edit-doc') as HTMLInputElement).value, birth_date: (document.getElementById('edit-birth') as HTMLInputElement).value || null, phone: (document.getElementById('edit-phone') as HTMLInputElement).value, gender: (document.getElementById('edit-gender') as HTMLSelectElement).value, email: (document.getElementById('edit-email') as HTMLInputElement).value, address: (document.getElementById('edit-address') as HTMLInputElement).value, allergies: (document.getElementById('edit-allergies') as HTMLInputElement).value })
     });
     if (formValues) {
-        Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
         const { error } = await supabase.from('patients').update(formValues).eq('id', patientId);
         if (error) Swal.fire('Error', error.message, 'error');
-        else { await Swal.fire({ icon: 'success', title: 'Datos actualizados', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+        else window.location.reload();
     }
   });
 
-  // ==========================================
-  // 8. ELIMINAR PACIENTE
-  // ==========================================
   document.getElementById('delete-patient-btn')?.addEventListener('click', async () => {
-      const result = await Swal.fire({
-          title: '⚠️ ¿ELIMINAR PACIENTE?',
-          html: `<div class="text-left space-y-3"><p class="text-gray-700">Estás a punto de eliminar a:</p><p class="font-bold text-lg text-gray-900">${editBtn?.dataset.fullName}</p><div class="bg-red-50 border-l-4 border-red-600 p-3 rounded"><p class="text-sm font-bold text-red-800">⚠️ ESTA ACCIÓN ES DESTRUCTIVA</p><p class="text-xs text-red-700 mt-1">Se borrarán todas sus citas, historial clínico y archivos. No se puede deshacer.</p></div></div>`,
-          icon: 'warning', showCancelButton: true, confirmButtonColor: '#DC2626', cancelButtonColor: '#6B7280', confirmButtonText: 'Sí, eliminar todo', cancelButtonText: 'Cancelar'
-      });
-
+      const result = await Swal.fire({ title: '⚠️ ¿ELIMINAR?', text: "Se borrará todo el historial.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí, borrar' });
       if (result.isConfirmed) {
-          Swal.fire({ title: 'Eliminando...', didOpen: () => Swal.showLoading() });
           const { error } = await supabase.from('patients').delete().eq('id', patientId);
           if (error) Swal.fire('Error', error.message, 'error');
-          else { await Swal.fire({ icon: 'success', title: 'Paciente eliminado', timer: 1000, showConfirmButton: false }); window.location.href = '/admin/pacientes'; }
+          else window.location.href = '/admin/pacientes';
       }
   });
 </script>
