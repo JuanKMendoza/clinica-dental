@@ -26,6 +26,11 @@ const { data: attachments } = await supabase.from("patient_attachments").select(
 
 const { data: servicesList } = await supabase.from("services").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
 const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
+const { data: businessData } = await supabase
+  .from("businesses")
+  .select("name, primary_color, logo_url, address")
+  .eq("id", patient.business_id)
+  .single();
 
 // Helpers
 const getInitials = (name: string) => name ? name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() : "??";
@@ -226,6 +231,12 @@ const age = calculateAge(patient.birth_date);
     data-services={JSON.stringify(servicesList)}
     data-records={JSON.stringify(records)}
     data-patient-info={JSON.stringify({name: patient.full_name, doc: patient.document_id, phone: patient.phone, email: patient.email})}
+    data-branding={JSON.stringify({
+        name: businessData?.name || "Clínica Dental", 
+        color: businessData?.primary_color || "#2563EB", 
+        logo: businessData?.logo_url || "",
+        address: businessData?.address || ""
+    })}
   ></div>
 
 </AdminLayout>
@@ -382,20 +393,53 @@ const age = calculateAge(patient.birth_date);
       });
 
       if (formValues) {
-          if(!formValues.service || !formValues.date || !formValues.time) return Swal.fire('Faltan datos', '', 'warning');
           Swal.fire({ title: 'Agendando...', didOpen: () => Swal.showLoading() });
+          
           try {
+              // Buscar nombres para el email
               const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio";
               const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Asignado";
+              
+              // 🔥 LEER DATOS DE MARCA
+              const branding = JSON.parse(pageData?.dataset.branding || '{}');
+
               const response = await fetch("/api/appointments/create", {
-                  method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ business_id: businessId, service_id: formValues.service, dentist_id: formValues.dentist || null, customer_name: patientInfo.name, customer_email: patientInfo.email, customer_phone: patientInfo.phone, patient_doc: patientInfo.doc, appointment_date: formValues.date, appointment_time: formValues.time, status: "confirmed", is_first_visit: false, marketing_source: "Admin Panel (Ficha)", service_name: serviceName, dentist_name: dentistName })
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                      business_id: businessId,
+                      service_id: formValues.service,
+                      dentist_id: formValues.dentist || null,
+                      customer_name: patientInfo.name,
+                      customer_email: patientInfo.email,
+                      customer_phone: patientInfo.phone,
+                      patient_doc: patientInfo.doc,
+                      appointment_date: formValues.date,
+                      appointment_time: formValues.time,
+                      status: "confirmed",
+                      is_first_visit: false,
+                      marketing_source: "Admin Panel (Ficha)",
+                      
+                      // 🔥 AGREGAMOS LOS DATOS FALTANTES:
+                      business_name: branding.name,
+                      brand_color: branding.color,
+                      logo_url: branding.logo,
+                      business_address: branding.address,
+                      
+                      service_name: serviceName,
+                      dentist_name: dentistName
+                  })
               });
+              
               const result = await response.json();
               if(!response.ok) throw new Error(result.error);
+
               await Swal.fire({ icon: 'success', title: 'Cita Agendada', timer: 1500, showConfirmButton: false });
               window.location.reload();
-          } catch (e: any) { Swal.fire('Error', e.message, 'error'); }
+
+          } catch (e: any) {
+              Swal.fire('Error', e.message, 'error');
+          }
       }
   });
 
