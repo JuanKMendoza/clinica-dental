@@ -464,52 +464,53 @@ const age = calculateAge(patient.birth_date);
   switchTab('tab-history');
 
 
-  // ==========================================
-  // 3. LÓGICA DEL ODONTOGRAMA (FIX DIENTES NEGROS)
-  // ==========================================
-  // ==========================================
-  // 3. MOTOR GRÁFICO PREMIUM (REEMPLAZO)
+ // ==========================================
+  // 3. MOTOR GRÁFICO PREMIUM (CORREGIDO - NO MÁS CUADROS NEGROS)
   // ==========================================
   
-  // Geometría Exacta (Basada en tu referencia Angular)
   const TOOTH_GEO = {
     top: "10,10 50,10 40,20 20,20",      
     bottom: "50,50 10,50 20,40 40,40",   
     left: "10,50 20,40 20,20 10,10",     
     right: "50,10 50,50 40,40 40,20",    
     center: "20,20 40,20 40,40 20,40",   
-    // Capas superpuestas (Overlays)
     absent1: "10,15 15,10 50,45 45,50", 
     absent2: "45,10 50,15 15,50 10,45",
     implant: "50,10 40,10 10,26 10,32 46,32 10,50 20,50 50,36 50,28 14,28" 
   };
 
-  // Renderiza el diente con estructura de capas
-  // Renderiza el diente asegurando fondo blanco y capas correctas
+  // 🔥 FIX CRÍTICO: fill="none" y opacity:0 en capas para evitar cuadros negros
   const renderTooth = (num, x, y) => `
     <g transform="translate(${x}, ${y})" class="tooth-group" id="tooth-${num}" data-tooth="${num}">
         <text x="30" y="-8" class="tooth-label">${num}</text>
         
-        <!-- CAPA BASE BLANCA (Fondo del diente) -->
-        <!-- Importante: fill="white" explícito para evitar cuadros negros -->
+        <!-- CAPA 1: Superficies Blancas (Base) -->
         <polygon points="${TOOTH_GEO.top}" class="tooth-surface" data-part="top" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
         <polygon points="${TOOTH_GEO.bottom}" class="tooth-surface" data-part="bottom" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
         <polygon points="${TOOTH_GEO.left}" class="tooth-surface" data-part="left" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
         <polygon points="${TOOTH_GEO.right}" class="tooth-surface" data-part="right" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
         <polygon points="${TOOTH_GEO.center}" class="tooth-surface" data-part="center" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
         
-        <!-- CAPAS DE ESTADO (Invisibles por defecto vía CSS) -->
-        <g class="layer-ausente"><polygon points="${TOOTH_GEO.absent1}"></polygon><polygon points="${TOOTH_GEO.absent2}"></polygon></g>
-        <circle cx="30" cy="30" r="18" class="layer-corona"></circle>
-        <circle cx="30" cy="30" r="10" class="layer-endo"></circle>
-        <polygon points="${TOOTH_GEO.implant}" class="layer-implante"></polygon>
+        <!-- CAPA 2: Ausente (X Gris Oscura) - Oculta por defecto -->
+        <g class="layer-ausente" style="opacity: 0; pointer-events: none;">
+             <polygon points="${TOOTH_GEO.absent1}" fill="#1f2937"></polygon>
+             <polygon points="${TOOTH_GEO.absent2}" fill="#1f2937"></polygon>
+        </g>
+
+        <!-- CAPA 3: Corona (Círculo Dorado) - Oculta por defecto -->
+        <circle cx="30" cy="30" r="18" class="layer-corona" fill="none" stroke="#eab308" stroke-width="3" style="opacity: 0; pointer-events: none;"></circle>
+        
+        <!-- CAPA 4: Endodoncia (Círculo Morado) - Oculta por defecto -->
+        <circle cx="30" cy="30" r="10" class="layer-endo" fill="none" stroke="#a855f7" stroke-width="3" style="opacity: 0; pointer-events: none;"></circle>
+
+        <!-- CAPA 5: Implante (Estructura Gris) - Oculta por defecto -->
+        <polygon points="${TOOTH_GEO.implant}" class="layer-implante" fill="none" stroke="#475569" stroke-width="2" style="opacity: 0; pointer-events: none;"></polygon>
     </g>`;
 
   function initOdontogram() {
     const canvas = document.getElementById('odontogram-canvas');
     if (!canvas) return;
     
-    // Configuración Responsive: Ancho fijo grande + scroll horizontal
     const SVG_WIDTH = 950; 
     let svgContent = `<svg width="${SVG_WIDTH}" height="350" viewBox="0 0 ${SVG_WIDTH} 350" style="min-width: ${SVG_WIDTH}px; display: block;">`;
     
@@ -517,11 +518,10 @@ const age = calculateAge(patient.birth_date);
     const GAP_MIDDLE = 40; 
     const ROW_HEIGHT = 160;
 
-    // Generar Cuadrantes FDI
-    [18,17,16,15,14,13,12,11].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, 40); }); // Q1
-    [21,22,23,24,25,26,27,28].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, 40); }); // Q2
-    [48,47,46,45,44,43,42,41].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, ROW_HEIGHT + 40); }); // Q4
-    [31,32,33,34,35,36,37,38].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, ROW_HEIGHT + 40); }); // Q3
+    [18,17,16,15,14,13,12,11].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, 40); });
+    [21,22,23,24,25,26,27,28].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, 40); });
+    [48,47,46,45,44,43,42,41].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, ROW_HEIGHT + 40); });
+    [31,32,33,34,35,36,37,38].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, ROW_HEIGHT + 40); });
     
     svgContent += '</svg>';
     canvas.innerHTML = svgContent;
@@ -532,11 +532,16 @@ const age = calculateAge(patient.birth_date);
   }
 
   function updateVisuals() {
-      // 1. Limpiar clases visuales previas
+      // 1. Resetear visuales (Forzar blanco y ocultar capas)
       document.querySelectorAll('.tooth-group').forEach(g => g.className.baseVal = 'tooth-group');
-      document.querySelectorAll('.tooth-surface').forEach(s => s.classList.remove('state-caries', 'state-resina', 'state-sellante'));
+      document.querySelectorAll('.tooth-surface').forEach(s => {
+          s.classList.remove('state-caries', 'state-resina', 'state-sellante');
+          s.setAttribute('fill', 'white'); 
+      });
+      // Ocultar todas las capas explícitamente
+      document.querySelectorAll('.layer-ausente, .layer-corona, .layer-endo, .layer-implante').forEach(l => l.style.opacity = '0');
 
-      // 2. Aplicar estado desde mouthState
+      // 2. Aplicar estado
       Object.keys(mouthState).forEach(key => {
           const status = mouthState[key];
           const [toothNum, part] = key.split('_');
@@ -544,17 +549,27 @@ const age = calculateAge(patient.birth_date);
           const group = document.getElementById(`tooth-${toothNum}`);
           if (!group) return;
 
-          // Estados que afectan a TODO el diente (Capas)
-          if (['ausente', 'corona', 'endodoncia', 'implante'].includes(status)) {
-              if (status === 'ausente') group.classList.add('has-ausente');
-              if (status === 'corona') group.classList.add('has-corona');
-              if (status === 'endodoncia') group.classList.add('has-endodoncia');
-              if (status === 'implante') group.classList.add('has-implante');
+          // Afecta capas (Manipulación directa de estilo para garantizar visibilidad)
+          if (status === 'ausente') {
+              group.classList.add('has-ausente');
+              group.querySelector('.layer-ausente').style.opacity = '1';
           } 
-          // Estados de Superficie (Caras)
+          else if (status === 'corona') {
+              group.classList.add('has-corona');
+              group.querySelector('.layer-corona').style.opacity = '1';
+          }
+          else if (status === 'endodoncia') {
+              group.classList.add('has-endodoncia');
+              group.querySelector('.layer-endo').style.opacity = '1';
+          }
+          else if (status === 'implante') {
+              group.classList.add('has-implante');
+              group.querySelector('.layer-implante').style.opacity = '1';
+          }
+          // Afecta superficies (Colores)
           else {
               const selectorPart = part || 'center'; 
-              const surface = group.querySelector(`[data-part="${selectorPart}"]`);
+              const surface = group.querySelector(`.tooth-surface[data-part="${selectorPart}"]`);
               if (surface) {
                   if (status === 'caries') surface.classList.add('state-caries');
                   if (status === 'resina') surface.classList.add('state-resina');
@@ -1501,12 +1516,11 @@ function viewOdontogramSnapshot(record) {
      ODONTOGRAMA PREMIUM STYLES
      ========================================== */
   
-  /* Contenedor Responsive con Scroll Suave */
   #odontogram-canvas {
     overflow-x: auto;
     overflow-y: hidden;
     padding: 20px 10px;
-    background-color: #f8fafc; /* Slate-50 */
+    background-color: #f8fafc;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
     scrollbar-width: thin;
@@ -1530,75 +1544,44 @@ function viewOdontogramSnapshot(record) {
     user-select: none;
   }
 
-  /* Polígonos (Caras) */
+  /* Superficies (El Diente Base) */
   .tooth-surface {
-    fill: #ffffff;
+    fill: #ffffff; /* Blanco base */
     stroke: #94a3b8;
     stroke-width: 1px;
     transition: all 0.2s ease;
   }
   .tooth-surface:hover { fill: #e2e8f0; stroke: #64748b; }
 
-  /* ==========================================
-     ESTADOS (Clases CSS)
-     ========================================== */
+  /* Estados de Color (Superficies) */
+  .state-caries { fill: #ef4444 !important; stroke: #b91c1c !important; }
+  .state-resina { fill: #3b82f6 !important; stroke: #1d4ed8 !important; }
+  .state-sellante { fill: #22c55e !important; stroke: #15803d !important; }
   
-  /* CARIES (Rojo) */
-  .state-caries { fill: #ef4444 !important; stroke: #b91c1c; }
-  
-  /* RESINA / OBTURADO (Azul) */
-  .state-resina { fill: #3b82f6 !important; stroke: #1d4ed8; }
-  
-  /* SELLANTE (Verde) */
-  .state-sellante { fill: #22c55e !important; stroke: #15803d; }
-  
-  /* CORONA (Overlay Círculo) */
+  /* Capas / Overlays (Estructurales) */
   .layer-corona {
-    fill: none;
-    stroke: #eab308; /* Gold */
-    stroke-width: 3px;
-    opacity: 0;
-    pointer-events: none;
     transition: opacity 0.3s;
+    /* Colores definidos inline en el JS para asegurar visibilidad */
   }
-  .has-corona .layer-corona { opacity: 1; }
   
-  /* ENDODONCIA (Overlay Centro) */
   .layer-endo {
-    fill: none;
-    stroke: #a855f7; /* Purple */
-    stroke-width: 3px;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .has-endodoncia .layer-endo { opacity: 1; }
-
-  /* AUSENTE (Overlay X + Opacidad Base) */
-  .layer-ausente {
-    fill: #1f2937;
-    opacity: 0;
-    pointer-events: none;
     transition: opacity 0.3s;
   }
-  .has-ausente .tooth-surface { opacity: 0.1; } 
-  .has-ausente .layer-ausente { opacity: 0.8; }
 
-  /* IMPLANTE (Overlay Estructura) */
-  .layer-implante {
-    fill: none;
-    stroke: #475569;
-    stroke-width: 2px;
-    opacity: 0;
-    pointer-events: none;
+  .layer-ausente {
+    transition: opacity 0.3s;
   }
-  .has-implante .layer-implante { opacity: 1; }
+  /* Cuando está ausente, el diente de fondo se atenúa */
+  .has-ausente .tooth-surface { opacity: 0.1; } 
 
-  /* Animaciones UI */
+  .layer-implante {
+    transition: opacity 0.3s;
+  }
+
+  /* Utilidades */
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-  
   .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-  
   .swal-opt:hover { background-color: #f3f4f6; }
 </style>
