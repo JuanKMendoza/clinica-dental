@@ -27,7 +27,16 @@ const { data: records } = await supabase.from("clinical_records").select(`*, den
 const { data: appointments } = await supabase.from("appointments").select(`*, services (name), dentists (name)`).eq("patient_id", id).order("appointment_date", { ascending: false });
 const { data: attachments } = await supabase.from("patient_attachments").select("*").eq("patient_id", id).order("created_at", { ascending: false });
 
-const { data: servicesList } = await supabase.from("services").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
+// 🔥 NUEVO: Cargar Odontograma Maestro y Planes de Tratamiento
+const { data: masterOdontogram } = await supabase.from("odontogram_master").select("*").eq("patient_id", id).single();
+const { data: treatmentPlans } = await supabase.from("treatment_plans").select(`*, dentists (name), services (name)`).eq("patient_id", id).order("created_at", { ascending: false });
+
+// Calcular Presupuestos (SSR)
+const pendingTreatments = treatmentPlans?.filter(t => t.status === 'pending') || [];
+const totalPendingCost = pendingTreatments.reduce((sum, t) => sum + (parseFloat(t.estimated_cost) || 0), 0);
+const urgentCount = pendingTreatments.filter(t => t.priority === 'urgent').length;
+
+const { data: servicesList } = await supabase.from("services").select("id, name, price").eq("business_id", patient.business_id).eq("is_active", true).order("name");
 const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
 
 // Helpers
@@ -82,16 +91,24 @@ const age = calculateAge(patient.birth_date);
         </div>
     </div>
 
-    <!-- GRID -->
+    <!-- GRID LAYOUT -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <!-- SIDEBAR -->
         <div class="space-y-6">
-            <!-- Tabs -->
+            <!-- TABS -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-2">
                 <nav class="flex lg:flex-col gap-1 overflow-x-auto whitespace-nowrap pb-2 lg:pb-0 scrollbar-hide">
                     <button class="tab-btn active flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-history">
                         <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div> Historia Clínica
+                    </button>
+                    <button class="tab-btn flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-odontogram">
+                        <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center shrink-0 relative">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {urgentCount > 0 && <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{urgentCount}</span>}
+                        </div> Odontograma
                     </button>
                     <button class="tab-btn flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-info">
                         <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div> Información
@@ -166,6 +183,7 @@ const age = calculateAge(patient.birth_date);
                             <option value="Diagnóstico">Diagnóstico</option>
                             <option value="Procedimiento">Procedimiento</option>
                             <option value="Prescripción">Prescripción</option>
+                            <option value="odontogram">Odontograma</option>
                         </select>
                         <select id="filter-doctor" class="w-full text-xs border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-brand-500">
                             <option value="all">Todos los Doctores</option>
@@ -180,6 +198,105 @@ const age = calculateAge(patient.birth_date);
                     <div class="flex gap-2">
                         <button id="tl-prev" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50">Anterior</button>
                         <button id="tl-next" class="px-3 py-1 bg-white border rounded hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: ODONTOGRAMA (MEJORADO) -->
+            <div id="tab-odontogram" class="tab-content hidden">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                        <div>
+                            <h2 class="font-bold text-gray-800 text-lg flex items-center gap-2">🦷 Odontograma Interactivo</h2>
+                            <p class="text-xs text-gray-500 mt-1">Toca un diente para diagnosticar.</p>
+                        </div>
+                        <div class="flex gap-2">
+                             <!-- Botón para guardar el estado actual (Snapshot) -->
+                            <button id="save-odontogram-btn" class="px-4 py-2 bg-teal-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-teal-700 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg> 
+                                Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LEYENDA -->
+                    <div class="flex flex-wrap gap-3 text-xs text-gray-600 pb-4 border-b border-gray-100">
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-white border-2 border-gray-300"></span> Sano</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span> Caries</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Resina</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-yellow-400"></span> Corona</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-gray-800"></span> Ausente</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-purple-500"></span> Endodoncia</div>
+                    </div>
+
+                    <!-- ⚠️ ZONA DE ALERTAS INTELIGENTES (Se llena con JS) -->
+                    <div id="clinical-alerts" class="mt-4 hidden space-y-2 animate-fade-in">
+                        <!-- Aquí JS inyectará: "Detectamos 3 caries. Crear Plan ($240)?" -->
+                    </div>
+                </div>
+
+                <!-- LIENZO -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
+                    <div id="odontogram-canvas" class="min-w-[600px] flex flex-col gap-8 items-center select-none"></div>
+                </div>
+                
+                <!-- PLAN DE TRATAMIENTO & PRESUPUESTO -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-lg">Plan de Tratamiento</h3>
+                            <p class="text-xs text-gray-500">Presupuesto y procedimientos</p>
+                        </div>
+                        <button id="create-treatment-plan-btn" class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-brand-700 transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg> 
+                            Agregar Manual
+                        </button>
+                    </div>
+                    
+                    {pendingTreatments.length > 0 && (
+                        <div class="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-4 flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-orange-100 text-orange-700 p-2 rounded-full">💰</span>
+                                <div>
+                                    <p class="text-xs text-orange-800 font-bold uppercase">Presupuesto Pendiente</p>
+                                    <p class="text-xs text-orange-600">{pendingTreatments.length} procedimientos</p>
+                                </div>
+                            </div>
+                            <span class="text-2xl font-bold text-orange-900">${totalPendingCost.toFixed(2)}</span>
+                        </div>
+                    )}
+
+                    <div id="treatments-list" class="space-y-3">
+                        {treatmentPlans && treatmentPlans.length > 0 ? (
+                            treatmentPlans.map(t => (
+                                <div class={`p-4 rounded-lg border-2 transition-all hover:shadow-md ${t.priority === 'urgent' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-gray-100'}`}>
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                {t.priority === 'urgent' && <span class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold">URGENTE</span>}
+                                                <span class="text-[10px] font-bold uppercase text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{t.status}</span>
+                                            </div>
+                                            <h4 class="font-bold text-gray-900">🦷 Diente {t.tooth_number} - {t.treatment_type}</h4>
+                                            <p class="text-sm text-gray-600 mt-1"><strong>Dx:</strong> {t.diagnosis}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-lg font-bold text-gray-900">${parseFloat(t.estimated_cost).toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Botones de Acción Rápida -->
+                                    {t.status === 'pending' && (
+                                        <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200/50">
+                                            <button class="flex-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 schedule-treatment-btn" data-id={t.id}>📅 Agendar</button>
+                                            <button class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 delete-treatment-btn" data-id={t.id}>🗑️</button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div class="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200"><p class="text-gray-500 font-medium">No hay plan de tratamiento activo.</p></div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -244,6 +361,7 @@ const age = calculateAge(patient.birth_date);
   </div>
 
   <!-- DATOS JSON OCULTOS PARA JS -->
+  <!-- DATOS JSON OCULTOS (Puente Server -> Client) -->
   <div 
     id="page-data" 
     data-patient-id={id} 
@@ -251,13 +369,10 @@ const age = calculateAge(patient.birth_date);
     data-dentists={JSON.stringify(dentistsList)}
     data-services={JSON.stringify(servicesList)}
     data-records={JSON.stringify(records)}
+    data-master-odontogram={JSON.stringify(masterOdontogram)}
+    data-treatment-plans={JSON.stringify(treatmentPlans)}     
     data-patient-info={JSON.stringify({name: patient.full_name, doc: patient.document_id, phone: patient.phone, email: patient.email})}
-    data-branding={JSON.stringify({
-        name: businessData?.name || "Clínica Dental", 
-        color: businessData?.primary_color || "#2563EB", 
-        logo: businessData?.logo_url || "",
-        address: businessData?.address || ""
-    })} 
+    data-branding={JSON.stringify({name: businessData?.name || "Clínica Dental", color: businessData?.primary_color || "#2563EB", logo: businessData?.logo_url || "", address: businessData?.address || ""})} 
   ></div>
 
 </AdminLayout>
@@ -266,28 +381,346 @@ const age = calculateAge(patient.birth_date);
   import Swal from "sweetalert2";
   import { supabase } from "../../../lib/supabase";
 
-  // DATOS GLOBALES
+  // ==========================================
+  // 1. VARIABLES GLOBALES (SINGLE SOURCE OF TRUTH)
+  // ==========================================
   const pageData = document.getElementById('page-data');
   const patientId = pageData?.dataset.patientId;
   const businessId = pageData?.dataset.businessId;
+  
+  // Parseo seguro de datos
   const dentists = JSON.parse(pageData?.dataset.dentists || '[]');
   const services = JSON.parse(pageData?.dataset.services || '[]');
   const records = JSON.parse(pageData?.dataset.records || '[]');
   const patientInfo = JSON.parse(pageData?.dataset.patientInfo || '{}');
+  const branding = JSON.parse(pageData?.dataset.branding || '{}');
+  const masterOdontogramData = JSON.parse(pageData?.dataset.masterOdontogram || 'null');
+  // Inicializamos el estado con lo que viene de la BD (Capa 1)
+  let mouthState = masterOdontogramData?.teeth_state || {};
+  
 
-  // Filtro Doctores
+  // Llenar filtro de doctores en el Header de Evoluciones
   const doctorFilter = document.getElementById('filter-doctor') as HTMLSelectElement;
-  dentists.forEach((d: any) => {
-      const opt = document.createElement('option');
-      opt.value = d.name; opt.textContent = d.name; doctorFilter.appendChild(opt);
-  });
+  if(doctorFilter) {
+      dentists.forEach((d: any) => {
+          const opt = document.createElement('option');
+          opt.value = d.name; 
+          opt.textContent = d.name; 
+          doctorFilter.appendChild(opt);
+      });
+  }
 
   // ==========================================
-  // TIMELINE LOGIC
+  // 2. LÓGICA DE PESTAÑAS (TABS)
+  // ==========================================
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  function switchTab(targetId: string) {
+      // 1. Ocultar todos los contenidos
+      tabContents.forEach(c => c.classList.add('hidden'));
+      
+      // 2. Resetear estilos de botones
+      tabBtns.forEach(b => { 
+          b.classList.remove('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600'); 
+          b.classList.add('text-gray-600'); 
+      });
+
+      // 3. Activar contenido seleccionado
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) {
+          targetContent.classList.remove('hidden');
+          targetContent.classList.add('animate-fade-in');
+      }
+
+      // 4. Activar botón correspondiente
+      const activeBtn = document.querySelector(`[data-target="${targetId}"]`);
+      if (activeBtn) {
+          activeBtn.classList.remove('text-gray-600');
+          activeBtn.classList.add('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600');
+      }
+      
+      // Si cambiamos al tab de Odontograma, asegurarnos que el canvas se vea bien
+      if(targetId === 'tab-odontogram') {
+          setTimeout(() => initOdontogram(), 50); 
+      }
+  }
+
+  // Listeners para tabs
+  tabBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+          const target = (e.currentTarget as HTMLElement).dataset.target;
+          if(target) switchTab(target);
+      });
+  });
+
+  // Activar primera tab por defecto al cargar
+  switchTab('tab-history');
+
+
+  // ==========================================
+  // 3. LÓGICA DEL ODONTOGRAMA (FIX DIENTES NEGROS)
+  // ==========================================
+  const canvas = document.getElementById('odontogram-canvas');
+
+  const quadrants = [
+      { id: 'q1', range: [18, 17, 16, 15, 14, 13, 12, 11] },
+      { id: 'q2', range: [21, 22, 23, 24, 25, 26, 27, 28] },
+      { id: 'q4', range: [48, 47, 46, 45, 44, 43, 42, 41] },
+      { id: 'q3', range: [31, 32, 33, 34, 35, 36, 37, 38] }
+  ];
+
+  // Helper: Dibuja un diente SVG con estilos INLINE para evitar que salga negro
+  const renderTooth = (num: any, x: any, y: any) => `
+    <g transform="translate(${x}, ${y})" class="tooth-group" data-tooth="${num}">
+        <text x="25" y="-5" class="tooth-label">${num}</text>
+        <!-- FIX: fill="white" explícito en cada polígono -->
+        <polygon points="0,0 50,0 35,15 15,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="top" data-key="${num}_top"></polygon>
+        <polygon points="0,50 50,50 35,35 15,35" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="bottom" data-key="${num}_bottom"></polygon>
+        <polygon points="0,0 0,50 15,35 15,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="left" data-key="${num}_left"></polygon>
+        <polygon points="50,0 50,50 35,35 35,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="right" data-key="${num}_right"></polygon>
+        <rect x="15" y="15" width="20" height="20" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="center" data-key="${num}_center"></rect>
+    </g>`;
+
+  function initOdontogram() {
+      if (!canvas) return;
+      // Generar SVG solo si está vacío
+      if(!canvas.innerHTML) {
+          let svg = '<svg width="650" height="300" viewBox="0 0 650 300">';
+          quadrants[0].range.forEach((t, i) => { svg += renderTooth(t, i * 35, 20); });
+          quadrants[1].range.forEach((t, i) => { svg += renderTooth(t, 320 + (i * 35), 20); });
+          quadrants[2].range.forEach((t, i) => { svg += renderTooth(t, i * 35, 160); });
+          quadrants[3].range.forEach((t, i) => { svg += renderTooth(t, 320 + (i * 35), 160); });
+          svg += '</svg>';
+          canvas.innerHTML = svg;
+          attachToothListeners();
+      }
+      updateVisuals();
+      detectProblems();
+  }
+
+  function updateVisuals() {
+      Object.keys(mouthState).forEach(key => {
+          const status = mouthState[key];
+          const el = document.querySelector(`.tooth-poly[data-key="${key}"]`);
+          if (el) el.setAttribute('data-status', status);
+      });
+  }
+
+  function attachToothListeners() {
+      document.querySelectorAll('.tooth-poly').forEach(poly => {
+          poly.addEventListener('click', async (e) => {
+              const el = e.target as HTMLElement;
+              const key = el.dataset.key; 
+              const toothId = el.parentElement?.dataset.tooth;
+
+              const { value: status } = await Swal.fire({
+                  title: `Diente ${toothId}`,
+                  input: 'select',
+                  inputOptions: { 'sano': '⚪ Sano', 'caries': '🔴 Caries', 'resina': '🔵 Resina', 'corona': '🟡 Corona', 'endodoncia': '🟣 Endodoncia', 'ausente': '⚫ Ausente' },
+                  showCancelButton: true,
+                  confirmButtonColor: 'rgb(var(--color-brand))'
+              });
+
+              if (status) {
+                  if (status === 'sano') { 
+                      delete mouthState[key || '']; 
+                      el.removeAttribute('data-status'); 
+                  } else { 
+                      mouthState[key || ''] = status; 
+                      el.setAttribute('data-status', status); 
+                  }
+                  detectProblems();
+              }
+          });
+      });
+  }
+
+  function detectProblems() {
+      const problems = [];
+      // Recorremos el estado actual de la boca
+      Object.keys(mouthState).forEach(key => {
+          const status = mouthState[key];
+          const tooth = key.split('_')[0];
+          
+          // Reglas de Negocio (Inteligencia)
+          if (status === 'caries') {
+              problems.push({ tooth, issue: 'Caries detectada', priority: 'urgent', treatment: 'Resina Composite', cost: 80 });
+          } else if (status === 'corona') {
+              problems.push({ tooth, issue: 'Corona antigua', priority: 'normal', treatment: 'Reemplazo de Corona', cost: 350 });
+          } else if (status === 'ausente') {
+              problems.push({ tooth, issue: 'Diente ausente', priority: 'normal', treatment: 'Implante o Prótesis', cost: 800 });
+          }
+      });
+
+      // Mostrar Alerta Inteligente
+      const alertBox = document.getElementById('clinical-alerts');
+      if (alertBox) {
+          if (problems.length > 0) {
+              alertBox.classList.remove('hidden');
+              alertBox.innerHTML = `
+                <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-amber-900 text-sm">⚠️ ${problems.length} Problemas Detectados</h4>
+                            <p class="text-xs text-amber-700">Se sugiere crear un plan de tratamiento.</p>
+                        </div>
+                        <button id="auto-plan-btn" class="px-3 py-1.5 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 shadow-sm transition-all">
+                            ✨ Crear Plan ($${problems.reduce((sum, p) => sum + p.cost, 0)})
+                        </button>
+                    </div>
+                </div>
+              `;
+              // Listener del botón mágico
+              document.getElementById('auto-plan-btn')?.addEventListener('click', () => createAutoPlan(problems));
+          } else {
+              alertBox.classList.add('hidden');
+          }
+      }
+  }
+
+  // Llamar a detectProblems() dentro de initOdontogram() y en los clicks de los dientes
+// ==========================================
+  // 5. PLAN DE TRATAMIENTO
+  // ==========================================
+  
+  // 🔥 PEGA LA FUNCIÓN AQUÍ (ESTE ES EL LUGAR CORRECTO):
+  async function createAutoPlan(problems) {
+      const result = await Swal.fire({
+          title: '✨ Crear Plan Automático',
+          html: `
+              <div class="text-left">
+                  <p class="mb-3 text-sm text-gray-600">Se crearán ${problems.length} tratamientos:</p>
+                  <ul class="space-y-2 text-sm">
+                      ${problems.map(p => `
+                          <li class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                              <span>🦷 ${p.tooth} - ${p.treatment}</span>
+                              <span class="font-bold">$${p.cost}</span>
+                          </li>
+                      `).join('')}
+                  </ul>
+                  <div class="mt-4 pt-3 border-t border-gray-200">
+                      <div class="flex justify-between font-bold text-lg">
+                          <span>Total:</span>
+                          <span class="text-brand-600">$${problems.reduce((sum, p) => sum + p.cost, 0)}</span>
+                      </div>
+                  </div>
+              </div>
+          `,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, crear plan',
+          confirmButtonColor: 'rgb(var(--color-brand))'
+      });
+
+      if (result.isConfirmed) {
+          Swal.fire({ title: 'Creando plan...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+          
+          const treatments = problems.map(p => ({
+              patient_id: patientId,
+              business_id: businessId,
+              tooth_number: p.tooth,
+              diagnosis: p.issue,
+              treatment_type: p.treatment,
+              priority: p.priority,
+              estimated_cost: p.cost,
+              status: 'pending'
+          }));
+
+          const { error } = await supabase.from('treatment_plans').insert(treatments);
+          
+          if (error) {
+              Swal.fire('Error', error.message, 'error');
+          } else {
+              await Swal.fire({ icon: 'success', title: '¡Plan Creado!', timer: 1500, showConfirmButton: false });
+              window.location.reload();
+          }
+      }
+  }
+  // Guardar Odontograma
+  document.getElementById('save-odontogram-btn')?.addEventListener('click', async () => {
+      let dentistOptions = {};
+      dentists.forEach((d: any) => dentistOptions[d.id] = d.name);
+      
+      const { value: doctorId } = await Swal.fire({
+          title: 'Guardar Estado Odontograma',
+          text: '¿Quién realiza el examen?',
+          input: 'select',
+          inputOptions: dentistOptions,
+          inputPlaceholder: 'Selecciona...',
+          showCancelButton: true,
+          confirmButtonText: 'Guardar',
+          confirmButtonColor: 'rgb(var(--color-brand))',
+          inputValidator: (v) => !v ? 'Selecciona un doctor' : null
+      });
+
+      if (doctorId) {
+          Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+          const { error } = await supabase.from('clinical_records').insert({
+              business_id: businessId,
+              patient_id: patientId,
+              record_type: 'odontogram',
+              description: 'Actualización de Odontograma',
+              data: mouthState,
+              dentist_id: doctorId
+          });
+
+          if (error) Swal.fire('Error', error.message, 'error');
+          else { 
+              await Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false }); 
+              window.location.reload(); 
+          }
+      }
+  });
+
+  // Ver Snapshot (Ver el gráfico del pasado)
+  // Helper para generar SVG estático
+  const getStaticSvg = (state: any) => {
+      let svg = '<svg width="100%" height="250" viewBox="0 0 650 300" style="pointer-events: none;">';
+      const getColor = (num: any, part: any) => {
+          const status = state[`${num}_${part}`];
+          if(status === 'caries') return '#ef4444';
+          if(status === 'resina') return '#3b82f6';
+          if(status === 'corona') return '#facc15';
+          if(status === 'ausente') return '#1f2937';
+          if(status === 'endodoncia') return '#a855f7';
+          return '#ffffff';
+      }
+      const render = (num: any, x: any, y: any) => `
+        <g transform="translate(${x}, ${y})">
+            <text x="25" y="-5" style="font-size:10px; fill:#64748b; font-weight:bold; text-anchor:middle;">${num}</text>
+            <polygon points="0,0 50,0 35,15 15,15" fill="${getColor(num,'top')}" stroke="#94a3b8" stroke-width="1"></polygon>
+            <polygon points="0,50 50,50 35,35 15,35" fill="${getColor(num,'bottom')}" stroke="#94a3b8" stroke-width="1"></polygon>
+            <polygon points="0,0 0,50 15,35 15,15" fill="${getColor(num,'left')}" stroke="#94a3b8" stroke-width="1"></polygon>
+            <polygon points="50,0 50,50 35,35 35,15" fill="${getColor(num,'right')}" stroke="#94a3b8" stroke-width="1"></polygon>
+            <rect x="15" y="15" width="20" height="20" fill="${getColor(num,'center')}" stroke="#94a3b8" stroke-width="1"></rect>
+        </g>`;
+      quadrants[0].range.forEach((t, i) => { svg += render(t, i * 35, 20); });
+      quadrants[1].range.forEach((t, i) => { svg += render(t, 320 + (i * 35), 20); });
+      quadrants[2].range.forEach((t, i) => { svg += render(t, i * 35, 160); });
+      quadrants[3].range.forEach((t, i) => { svg += render(t, 320 + (i * 35), 160); });
+      svg += '</svg>';
+      return svg;
+  }
+
+  // Función global para ser llamada desde el timeline
+  (window as any).viewOdontogramSnapshot = (recordJson: string) => {
+      const record = JSON.parse(decodeURIComponent(recordJson));
+      Swal.fire({
+          title: `Odontograma del ${new Date(record.created_at).toLocaleDateString()}`,
+          html: `<p class="text-sm text-gray-500 mb-4">Dr. ${record.dentists?.name || "Sin asignar"}</p><div class="overflow-x-auto bg-gray-50 p-4 rounded-xl border border-gray-200">${getStaticSvg(record.data || {})}</div>`,
+          width: '800px', showConfirmButton: true, confirmButtonText: 'Cerrar', confirmButtonColor: '#334155'
+      });
+  };
+
+
+  // ==========================================
+  // 4. TIMELINE Y FILTROS (RESTAURADO)
   // ==========================================
   const timelineContainer = document.getElementById('timeline-container');
   const searchNotes = document.getElementById('search-notes') as HTMLInputElement;
   const filterType = document.getElementById('filter-type') as HTMLSelectElement;
+  const doctorFilterElement = document.getElementById('filter-doctor') as HTMLSelectElement;
   const tlPagination = document.getElementById('timeline-pagination');
   
   let tlCurrentPage = 1;
@@ -309,29 +742,51 @@ const age = calculateAge(patient.birth_date);
       const pageSlice = filteredRecords.slice(start, end);
 
       pageSlice.forEach((r: any) => {
+          // Detectar si es Odontograma para mostrar botón especial
+          let extraContent = '';
+          let iconType = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 mb-1">${r.record_type}</span>`;
+          let borderColor = 'bg-brand-500';
+
+          if (r.record_type === 'odontogram') {
+              iconType = `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-teal-50 text-teal-700 border border-teal-100 mb-1">🦷 Odontograma</span>`;
+              borderColor = 'bg-teal-500';
+              // Usamos onclick inline con encodeURIComponent para pasar el objeto complejo
+              const rString = encodeURIComponent(JSON.stringify(r));
+              extraContent = `<div class="mt-3 pt-3 border-t border-gray-100"><button onclick="window.viewOdontogramSnapshot('${rString}')" class="flex items-center gap-2 text-xs font-bold text-teal-600 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>Ver Mapa Dental</button></div>`;
+          }
+
           const div = document.createElement('div');
           div.className = 'relative group';
           div.innerHTML = `
-            <div class="absolute -left-[39px] top-1 w-5 h-5 rounded-full border-4 border-white bg-brand-500 shadow-sm"></div>
+            <div class="absolute -left-[39px] top-1 w-5 h-5 rounded-full border-4 border-white ${borderColor} shadow-sm"></div>
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow relative group/card">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 mb-1">${r.record_type}</span>
+                        ${iconType}
                         <h4 class="font-bold text-gray-900 text-sm">Atendido por: ${r.dentists?.name || 'Clínica'}</h4>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-400 font-mono">${new Date(r.created_at).toLocaleDateString('es-CO', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
+                        
+                        ${r.record_type !== 'odontogram' ? `
                         <div class="hidden group-hover/card:flex gap-1 ml-2">
-                            <button class="text-gray-400 hover:text-brand-600 p-1 edit-record-btn" data-id="${r.id}" title="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                            <button class="text-gray-400 hover:text-red-600 p-1 delete-record-btn" data-id="${r.id}" title="Borrar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                            <button class="text-gray-400 hover:text-brand-600 p-1 edit-record-btn" title="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                            <button class="text-gray-400 hover:text-red-500 delete-record-btn" title="Borrar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap note-content">${r.description}</div>
+                ${extraContent}
             </div>
           `;
-          div.querySelector('.edit-record-btn')?.addEventListener('click', () => editRecord(r));
-          div.querySelector('.delete-record-btn')?.addEventListener('click', () => deleteRecord(r.id));
+          
+          // Listeners para botones de edición (solo notas normales)
+          if(r.record_type !== 'odontogram') {
+              div.querySelector('.edit-record-btn')?.addEventListener('click', () => editRecord(r));
+              div.querySelector('.delete-record-btn')?.addEventListener('click', () => deleteRecord(r.id));
+          }
+          
           timelineContainer.appendChild(div);
       });
 
@@ -346,9 +801,13 @@ const age = calculateAge(patient.birth_date);
   function applyFilters() {
       const q = searchNotes.value.toLowerCase();
       const type = filterType.value;
-      const doc = doctorFilter.value;
+      const doc = doctorFilterElement ? doctorFilterElement.value : 'all';
+      
       filteredRecords = records.filter((r: any) => {
-          return (r.description.toLowerCase().includes(q) || r.record_type.toLowerCase().includes(q)) && (type === 'all' || r.record_type === type) && (doc === 'all' || (r.dentists?.name === doc));
+          const matchText = r.description.toLowerCase().includes(q) || r.record_type.toLowerCase().includes(q);
+          const matchType = type === 'all' || r.record_type === type;
+          const matchDoc = doc === 'all' || (r.dentists?.name === doc);
+          return matchText && matchType && matchDoc;
       });
       tlCurrentPage = 1;
       renderTimeline();
@@ -356,15 +815,23 @@ const age = calculateAge(patient.birth_date);
 
   searchNotes?.addEventListener('keyup', applyFilters);
   filterType?.addEventListener('change', applyFilters);
-  doctorFilter?.addEventListener('change', applyFilters);
+  doctorFilterElement?.addEventListener('change', applyFilters);
+  
   document.getElementById('tl-prev')?.addEventListener('click', () => { if(tlCurrentPage > 1) { tlCurrentPage--; renderTimeline(); }});
   document.getElementById('tl-next')?.addEventListener('click', () => { if((tlCurrentPage * tlItemsPerPage) < filteredRecords.length) { tlCurrentPage++; renderTimeline(); }});
-  renderTimeline();
+  
+  // Render inicial con pequeño delay para asegurar DOM
+  setTimeout(() => {
+      initOdontogram();
+      renderTimeline();
+  }, 100);
+
 
   // ==========================================
-  // GESTIÓN DE CITAS
+  // 5. GESTIÓN DE CITAS (CRUD COMPLETO)
   // ==========================================
   
+  // Borrar Cita
   document.querySelectorAll('.delete-appt-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
           const id = (btn as HTMLElement).dataset.id;
@@ -378,6 +845,7 @@ const age = calculateAge(patient.birth_date);
       });
   });
 
+  // Editar Cita
   document.querySelectorAll('.edit-appt-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
           const ds = (btn as HTMLElement).dataset;
@@ -387,16 +855,15 @@ const age = calculateAge(patient.birth_date);
               showCancelButton: true, confirmButtonText: 'Guardar', preConfirm: () => [(document.getElementById('swal-date') as HTMLInputElement).value, (document.getElementById('swal-time') as HTMLInputElement).value]
           });
           if (formValues) {
-              const [newDate, newTime] = formValues;
-              if (!newDate || !newTime) return;
               Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
-              const { error } = await supabase.from("appointments").update({ appointment_date: newDate, appointment_time: newTime }).eq("id", ds.id);
+              const { error } = await supabase.from("appointments").update({ appointment_date: formValues[0], appointment_time: formValues[1] }).eq("id", ds.id);
               if (error) Swal.fire('Error', error.message, 'error');
               else { await Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
           }
       });
   });
 
+  // Quick Book (Agendar desde Ficha)
   document.getElementById('quick-book-btn')?.addEventListener('click', async () => {
       let dentistOptions = '<option value="">Cualquiera</option>';
       dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
@@ -417,14 +884,10 @@ const age = calculateAge(patient.birth_date);
               const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio";
               const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Asignado";
               
-              // 🔥 DATOS DE MARCA CORREGIDOS
-              const branding = JSON.parse(pageData?.dataset.branding || '{}');
-
               const response = await fetch("/api/appointments/create", {
                   method: "POST", headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                       business_id: businessId, service_id: formValues.service, dentist_id: formValues.dentist || null, customer_name: patientInfo.name, customer_email: patientInfo.email, customer_phone: patientInfo.phone, patient_doc: patientInfo.doc, appointment_date: formValues.date, appointment_time: formValues.time, status: "confirmed", is_first_visit: false, marketing_source: "Admin Panel (Ficha)",
-                      // Datos Email
                       service_name: serviceName, dentist_name: dentistName,
                       business_name: branding.name, brand_color: branding.color, logo_url: branding.logo, business_address: branding.address
                   })
@@ -438,145 +901,104 @@ const age = calculateAge(patient.birth_date);
   });
 
   // ==========================================
-  // FUNCIONES CRUD NOTAS
+  // 6. FUNCIONES CRUD NOTAS (CREAR / EDITAR / BORRAR)
   // ==========================================
+  
+  // Agregar Nota (Avanzada con Tipo y Doctor)
+  document.getElementById('add-evolution-btn')?.addEventListener('click', async () => {
+    let dentistOptions = '<option value="">-- Seleccionar --</option>';
+    dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+
+    const { value: formValues } = await Swal.fire({
+        title: 'Nueva Nota Clínica',
+        html: `
+            <div class="flex flex-col gap-3 text-left">
+                <div><label class="text-xs font-bold text-gray-500 uppercase">Tipo de Registro</label>
+                <select id="note-type" class="swal2-input m-0 w-full text-sm"><option value="Evolución">Evolución</option><option value="Anamnesis">Anamnesis</option><option value="Diagnóstico">Diagnóstico</option><option value="Procedimiento">Procedimiento</option><option value="Prescripción">Receta</option></select></div>
+                <div><label class="text-xs font-bold text-gray-500 uppercase">Profesional Responsable</label>
+                <select id="note-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div>
+                <div><label class="text-xs font-bold text-gray-500 uppercase">Detalle de la nota</label>
+                <textarea id="note-text" class="swal2-textarea m-0 w-full h-32 text-sm" placeholder="Escribe los detalles..."></textarea></div>
+            </div>
+        `,
+        showCancelButton: true, confirmButtonText: 'Guardar', confirmButtonColor: 'rgb(var(--color-brand))',
+        preConfirm: () => ({ type: (document.getElementById('note-type') as HTMLSelectElement).value, dentist: (document.getElementById('note-dentist') as HTMLSelectElement).value, text: (document.getElementById('note-text') as HTMLTextAreaElement).value })
+    });
+
+    if (formValues) {
+        if(!formValues.dentist || !formValues.text) return Swal.fire('Faltan datos', 'Selecciona doctor y escribe nota', 'warning');
+        
+        Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+        const { error } = await supabase.from('clinical_records').insert({
+            business_id: businessId, patient_id: patientId, dentist_id: formValues.dentist, record_type: formValues.type, description: formValues.text
+        });
+
+        if (error) Swal.fire('Error', error.message, 'error');
+        else { await Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+    }
+  });
+
+  // Funciones Auxiliares para Editar/Borrar
   async function editRecord(r: any) {
       const { value: text } = await Swal.fire({ input: 'textarea', inputValue: r.description, inputLabel: 'Editar Nota', showCancelButton: true, confirmButtonText: 'Actualizar', confirmButtonColor: 'rgb(var(--color-brand))', customClass: { input: 'h-32 text-sm' } });
       if (text) {
         Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
         const { error } = await supabase.from('clinical_records').update({ description: text }).eq('id', r.id);
-        if (error) Swal.fire('Error', error.message, 'error');
-        else { const idx = records.findIndex((rec:any) => rec.id === r.id); if(idx !== -1) records[idx].description = text; applyFilters(); Swal.close(); }
+        if (error) Swal.fire('Error', error.message, 'error'); else { window.location.reload(); }
       }
   }
+
   async function deleteRecord(id: string) {
       const result = await Swal.fire({ title: '¿Borrar nota?', text: "No se puede deshacer.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
       if(result.isConfirmed) {
          Swal.fire({ title: 'Borrando...', didOpen: () => Swal.showLoading() });
          const { error } = await supabase.from('clinical_records').delete().eq('id', id);
-         if (error) Swal.fire('Error', error.message, 'error');
-         else { const idx = records.findIndex((rec:any) => rec.id === id); if(idx !== -1) records.splice(idx, 1); applyFilters(); Swal.close(); }
+         if (error) Swal.fire('Error', error.message, 'error'); else { window.location.reload(); }
       }
   }
 
-  document.getElementById('add-evolution-btn')?.addEventListener('click', async () => {
-    let dentistOptions = '<option value="">-- Seleccionar --</option>';
-    dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
-    const { value: formValues } = await Swal.fire({ title: 'Nueva Nota', html: `<div class="flex flex-col gap-3 text-left"><div><label class="text-xs font-bold text-gray-500 uppercase">Tipo</label><select id="note-type" class="swal2-input m-0 w-full text-sm"><option value="Evolución">Evolución</option><option value="Anamnesis">Anamnesis</option><option value="Diagnóstico">Diagnóstico</option><option value="Procedimiento">Procedimiento</option><option value="Prescripción">Receta</option></select></div><div><label class="text-xs font-bold text-gray-500 uppercase">Doctor</label><select id="note-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div><div><label class="text-xs font-bold text-gray-500 uppercase">Detalle</label><textarea id="note-text" class="swal2-textarea m-0 w-full h-32 text-sm" placeholder="Escribe..."></textarea></div></div>`, showCancelButton: true, confirmButtonText: 'Guardar', confirmButtonColor: 'rgb(var(--color-brand))', preConfirm: () => ({ type: (document.getElementById('note-type') as HTMLSelectElement).value, dentist: (document.getElementById('note-dentist') as HTMLSelectElement).value, text: (document.getElementById('note-text') as HTMLTextAreaElement).value }) });
-    if (formValues) {
-        if(!formValues.dentist || !formValues.text) return Swal.fire('Error', 'Faltan datos', 'warning');
-        Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
-        const { data, error } = await supabase.from('clinical_records').insert({ business_id: businessId, patient_id: patientId, dentist_id: formValues.dentist, record_type: formValues.type, description: formValues.text }).select(`*, dentists(name)`).single();
-        if (error) Swal.fire('Error', error.message, 'error');
-        else { records.unshift(data); applyFilters(); Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false }); }
-    }
-  });
-
   // ==========================================
-  // STORAGE (SUBIDA DE ARCHIVOS)
+  // STORAGE & MISC
   // ==========================================
   const fileInput = document.getElementById('file-upload') as HTMLInputElement;
   const uploadBtn = document.getElementById('upload-btn');
-
   uploadBtn?.addEventListener('click', () => fileInput.click());
-
   fileInput?.addEventListener('change', async (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
-
-      // 1. Validar Tamaño (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-          Swal.fire('Archivo muy grande', 'Máximo 5MB permitido', 'warning');
-          return;
-      }
-
+      if (file.size > 5 * 1024 * 1024) return Swal.fire('Archivo muy grande', 'Máximo 5MB', 'warning');
       Swal.fire({ title: 'Subiendo...', didOpen: () => Swal.showLoading() });
-
-      // 2. Subir a Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${businessId}/${patientId}/${fileName}`;
-
+      const filePath = `${businessId}/${patientId}/${Date.now()}.${file.name.split('.').pop()}`;
       const { error: uploadError } = await supabase.storage.from('clinical-files').upload(filePath, file);
-
-      if (uploadError) {
-          Swal.fire('Error al subir', uploadError.message, 'error');
-          return;
-      }
-
-      // 3. Guardar Referencia en BD
-      const { error: dbError } = await supabase.from('patient_attachments').insert({
-          business_id: businessId,
-          patient_id: patientId,
-          file_name: file.name,
-          file_url: filePath,
-          file_type: file.type
-      });
-
-      if (dbError) {
-          Swal.fire('Error al guardar', dbError.message, 'error');
-      } else {
-          await Swal.fire({ icon: 'success', title: 'Archivo subido', timer: 1000, showConfirmButton: false });
-          window.location.reload();
-      }
+      if (uploadError) return Swal.fire('Error al subir', uploadError.message, 'error');
+      const { error: dbError } = await supabase.from('patient_attachments').insert({ business_id: businessId, patient_id: patientId, file_name: file.name, file_url: filePath, file_type: file.type });
+      if (dbError) Swal.fire('Error al guardar', dbError.message, 'error'); else window.location.reload();
   });
 
-  // VER / DESCARGAR ARCHIVO (SIGNED URL)
   document.querySelectorAll('.file-card').forEach(card => {
       card.addEventListener('click', async (e) => {
-          // Si click en botón borrar, no abrir
           if ((e.target as HTMLElement).closest('.delete-file-btn')) return;
-
           const path = (card as HTMLElement).dataset.path;
           if (!path) return;
-
-          // Generar URL firmada (válida por 60 seg)
           const { data, error } = await supabase.storage.from('clinical-files').createSignedUrl(path, 60);
-          
-          if (error) Swal.fire('Error', 'No se pudo abrir el archivo', 'error');
-          else window.open(data.signedUrl, '_blank');
+          if (error) Swal.fire('Error', 'No se pudo abrir', 'error'); else window.open(data.signedUrl, '_blank');
       });
   });
 
-  // BORRAR ARCHIVO
   document.querySelectorAll('.delete-file-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-          e.stopPropagation(); // Evitar abrir archivo
+          e.stopPropagation();
           const id = (btn as HTMLElement).dataset.id;
           const path = (btn as HTMLElement).dataset.path;
-
-          const result = await Swal.fire({ title: '¿Borrar archivo?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Borrar' });
+          const result = await Swal.fire({ title: '¿Borrar?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Borrar' });
           if (!result.isConfirmed) return;
-
-          Swal.fire({ title: 'Borrando...', didOpen: () => Swal.showLoading() });
-
-          // 1. Borrar de Storage
           if (path) await supabase.storage.from('clinical-files').remove([path]);
-
-          // 2. Borrar de BD
           const { error } = await supabase.from('patient_attachments').delete().eq('id', id);
-
-          if (error) Swal.fire('Error', error.message, 'error');
-          else { await Swal.fire({ icon: 'success', title: 'Borrado', timer: 1000, showConfirmButton: false }); window.location.reload(); }
+          if (error) Swal.fire('Error', error.message, 'error'); else window.location.reload();
       });
   });
 
-  // TABS LOGIC
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        tabBtns.forEach(b => { b.classList.remove('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600'); b.classList.add('text-gray-600'); });
-        tabContents.forEach(c => c.classList.add('hidden'));
-        const targetId = (btn as HTMLElement).dataset.target;
-        document.getElementById(targetId || '')?.classList.remove('hidden');
-        btn.classList.remove('text-gray-600');
-        btn.classList.add('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600');
-    });
-  });
-  (tabBtns[0] as HTMLElement).click();
-
-  // EXPORT, EDIT PATIENT, DELETE PATIENT
+  // Exportar Excel
   document.getElementById('export-history-btn')?.addEventListener('click', () => {
       let csv = "Fecha;Tipo;Doctor;Nota\n";
       records.forEach((r: any) => {
@@ -587,13 +1009,15 @@ const age = calculateAge(patient.birth_date);
       const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `historia_${patientId}.csv`; a.click();
   });
 
-  const editBtn = document.getElementById('edit-patient-btn');
-  editBtn?.addEventListener('click', async () => {
-    const ds = (editBtn as HTMLElement).dataset;
+  // Editar Paciente
+  const editPBtn = document.getElementById('edit-patient-btn');
+  editPBtn?.addEventListener('click', async () => {
+    const ds = (editPBtn as HTMLElement).dataset;
     const { value: formValues } = await Swal.fire({ title: 'Editar Información', html: `<div class="grid grid-cols-1 gap-3 text-left"><div><label class="text-xs font-bold text-gray-500">Nombre</label><input id="edit-name" class="swal2-input m-0 w-full" value="${ds.fullName || ''}"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Doc</label><input id="edit-doc" class="swal2-input m-0 w-full" value="${ds.doc || ''}"></div><div><label class="text-xs font-bold text-gray-500">Nacimiento</label><input id="edit-birth" type="date" class="swal2-input m-0 w-full" value="${ds.birth || ''}"></div></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500">Teléfono</label><input id="edit-phone" class="swal2-input m-0 w-full" value="${ds.phone || ''}"></div><div><label class="text-xs font-bold text-gray-500">Género</label><select id="edit-gender" class="swal2-input m-0 w-full"><option value="masculino" ${ds.gender === 'masculino'?'selected':''}>Masculino</option><option value="femenino" ${ds.gender === 'femenino'?'selected':''}>Femenino</option><option value="otro" ${ds.gender === 'otro'?'selected':''}>Otro</option></select></div></div><div><label class="text-xs font-bold text-gray-500">Email</label><input id="edit-email" class="swal2-input m-0 w-full" value="${ds.email || ''}"></div><div><label class="text-xs font-bold text-gray-500">Dirección</label><input id="edit-address" class="swal2-input m-0 w-full" value="${ds.address || ''}"></div><div><label class="text-xs font-bold text-red-500">Alergias</label><input id="edit-allergies" class="swal2-input m-0 w-full border-red-200" value="${ds.allergies || ''}"></div></div>`, showCancelButton: true, confirmButtonText: 'Guardar', confirmButtonColor: 'rgb(var(--color-brand))', preConfirm: () => ({ full_name: (document.getElementById('edit-name') as HTMLInputElement).value, document_id: (document.getElementById('edit-doc') as HTMLInputElement).value, birth_date: (document.getElementById('edit-birth') as HTMLInputElement).value || null, phone: (document.getElementById('edit-phone') as HTMLInputElement).value, gender: (document.getElementById('edit-gender') as HTMLSelectElement).value, email: (document.getElementById('edit-email') as HTMLInputElement).value, address: (document.getElementById('edit-address') as HTMLInputElement).value, allergies: (document.getElementById('edit-allergies') as HTMLInputElement).value }) });
     if (formValues) { const { error } = await supabase.from('patients').update(formValues).eq('id', patientId); if (error) Swal.fire('Error', error.message, 'error'); else window.location.reload(); }
   });
 
+  // Eliminar Paciente
   document.getElementById('delete-patient-btn')?.addEventListener('click', async () => {
       const result = await Swal.fire({ title: '⚠️ ¿ELIMINAR?', text: "Se borrará todo el historial.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí, borrar' });
       if (result.isConfirmed) { const { error } = await supabase.from('patients').delete().eq('id', patientId); if (error) Swal.fire('Error', error.message, 'error'); else window.location.href = '/admin/pacientes'; }
@@ -601,6 +1025,15 @@ const age = calculateAge(patient.birth_date);
 </script>
 
 <style>
+  .tooth-poly { fill: #ffffff; stroke: #64748b; stroke-width: 1px; transition: all 0.2s ease; cursor: pointer; }
+  .tooth-poly:hover { fill: #e2e8f0; }
+  .tooth-label { font-size: 11px; font-weight: 800; fill: #334155; text-anchor: middle; pointer-events: none; }
+  .tooth-poly[data-status="caries"] { fill: #ef4444 !important; stroke: #b91c1c; }
+  .tooth-poly[data-status="resina"] { fill: #3b82f6 !important; stroke: #1d4ed8; }
+  .tooth-poly[data-status="corona"] { fill: #facc15 !important; stroke: #ca8a04; }
+  .tooth-poly[data-status="ausente"] { fill: #1f2937 !important; opacity: 0.6; }
+  .tooth-poly[data-status="endodoncia"] { fill: #a855f7 !important; stroke: #7e22ce; }
+
   .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
