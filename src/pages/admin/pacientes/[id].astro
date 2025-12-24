@@ -467,139 +467,169 @@ const age = calculateAge(patient.birth_date);
   // ==========================================
   // 3. LÓGICA DEL ODONTOGRAMA (FIX DIENTES NEGROS)
   // ==========================================
-  const canvas = document.getElementById('odontogram-canvas');
+  // ==========================================
+  // 3. MOTOR GRÁFICO PREMIUM (REEMPLAZO)
+  // ==========================================
+  
+  // Geometría Exacta (Basada en tu referencia Angular)
+  const TOOTH_GEO = {
+    top: "10,10 50,10 40,20 20,20",      
+    bottom: "50,50 10,50 20,40 40,40",   
+    left: "10,50 20,40 20,20 10,10",     
+    right: "50,10 50,50 40,40 40,20",    
+    center: "20,20 40,20 40,40 20,40",   
+    // Capas superpuestas (Overlays)
+    absent1: "10,15 15,10 50,45 45,50", 
+    absent2: "45,10 50,15 15,50 10,45",
+    implant: "50,10 40,10 10,26 10,32 46,32 10,50 20,50 50,36 50,28 14,28" 
+  };
 
-  const quadrants = [
-      { id: 'q1', range: [18, 17, 16, 15, 14, 13, 12, 11] },
-      { id: 'q2', range: [21, 22, 23, 24, 25, 26, 27, 28] },
-      { id: 'q4', range: [48, 47, 46, 45, 44, 43, 42, 41] },
-      { id: 'q3', range: [31, 32, 33, 34, 35, 36, 37, 38] }
-  ];
-
-  // Helper: Dibuja un diente SVG con estilos INLINE para evitar que salga negro
-  const renderTooth = (num: any, x: any, y: any) => `
-    <g transform="translate(${x}, ${y})" class="tooth-group" data-tooth="${num}">
-        <text x="25" y="-5" class="tooth-label">${num}</text>
-        <!-- FIX: fill="white" explícito en cada polígono -->
-        <polygon points="0,0 50,0 35,15 15,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="top" data-key="${num}_top"></polygon>
-        <polygon points="0,50 50,50 35,35 15,35" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="bottom" data-key="${num}_bottom"></polygon>
-        <polygon points="0,0 0,50 15,35 15,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="left" data-key="${num}_left"></polygon>
-        <polygon points="50,0 50,50 35,35 35,15" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="right" data-key="${num}_right"></polygon>
-        <rect x="15" y="15" width="20" height="20" fill="white" stroke="#94a3b8" stroke-width="1" class="tooth-poly" data-part="center" data-key="${num}_center"></rect>
+  // Renderiza el diente con estructura de capas
+  // Renderiza el diente asegurando fondo blanco y capas correctas
+  const renderTooth = (num, x, y) => `
+    <g transform="translate(${x}, ${y})" class="tooth-group" id="tooth-${num}" data-tooth="${num}">
+        <text x="30" y="-8" class="tooth-label">${num}</text>
+        
+        <!-- CAPA BASE BLANCA (Fondo del diente) -->
+        <!-- Importante: fill="white" explícito para evitar cuadros negros -->
+        <polygon points="${TOOTH_GEO.top}" class="tooth-surface" data-part="top" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
+        <polygon points="${TOOTH_GEO.bottom}" class="tooth-surface" data-part="bottom" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
+        <polygon points="${TOOTH_GEO.left}" class="tooth-surface" data-part="left" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
+        <polygon points="${TOOTH_GEO.right}" class="tooth-surface" data-part="right" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
+        <polygon points="${TOOTH_GEO.center}" class="tooth-surface" data-part="center" fill="white" stroke="#94a3b8" stroke-width="1"></polygon>
+        
+        <!-- CAPAS DE ESTADO (Invisibles por defecto vía CSS) -->
+        <g class="layer-ausente"><polygon points="${TOOTH_GEO.absent1}"></polygon><polygon points="${TOOTH_GEO.absent2}"></polygon></g>
+        <circle cx="30" cy="30" r="18" class="layer-corona"></circle>
+        <circle cx="30" cy="30" r="10" class="layer-endo"></circle>
+        <polygon points="${TOOTH_GEO.implant}" class="layer-implante"></polygon>
     </g>`;
 
   function initOdontogram() {
+    const canvas = document.getElementById('odontogram-canvas');
     if (!canvas) return;
     
-    // 🎯 SVG RESPONSIVE AJUSTADO
-    // ViewBox más ancho (850px) para dar aire
-    let svgContent = '<svg width="100%" height="100%" viewBox="0 0 850 360" style="min-width: 850px; display: block;">';
+    // Configuración Responsive: Ancho fijo grande + scroll horizontal
+    const SVG_WIDTH = 950; 
+    let svgContent = `<svg width="${SVG_WIDTH}" height="350" viewBox="0 0 ${SVG_WIDTH} 350" style="min-width: ${SVG_WIDTH}px; display: block;">`;
     
-    const SPACING = 55; // Espacio entre dientes
-    const GAP = 460;    // Separación central entre cuadrantes
+    const SPACING = 55;
+    const GAP_MIDDLE = 40; 
+    const ROW_HEIGHT = 160;
 
-    // CUADRANTE 1 (Superior Derecho)
-    quadrants[0].range.forEach((t, i) => { 
-        svgContent += renderTooth(t, i * SPACING, 30); 
-    });
-    
-    // CUADRANTE 2 (Superior Izquierdo) - Separado
-    quadrants[1].range.forEach((t, i) => { 
-        svgContent += renderTooth(t, GAP + (i * SPACING), 30); 
-    });
-    
-    // CUADRANTE 3 (Inferior Derecho)
-    quadrants[2].range.forEach((t, i) => { 
-        svgContent += renderTooth(t, i * SPACING, 200); 
-    });
-    
-    // CUADRANTE 4 (Inferior Izquierdo) - Separado
-    quadrants[3].range.forEach((t, i) => { 
-        svgContent += renderTooth(t, GAP + (i * SPACING), 200);
-    });
+    // Generar Cuadrantes FDI
+    [18,17,16,15,14,13,12,11].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, 40); }); // Q1
+    [21,22,23,24,25,26,27,28].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, 40); }); // Q2
+    [48,47,46,45,44,43,42,41].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, ROW_HEIGHT + 40); }); // Q4
+    [31,32,33,34,35,36,37,38].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, ROW_HEIGHT + 40); }); // Q3
     
     svgContent += '</svg>';
     canvas.innerHTML = svgContent;
     
-    // Importante: Llamar updateVisuals DESPUÉS de pintar el SVG
-    setTimeout(() => {
-        updateVisuals();
-        attachToothListeners();
-        detectProblems();
-    }, 50);
-}
+    updateVisuals();
+    attachToothListeners();
+    detectProblems();
+  }
 
   function updateVisuals() {
-      // 1. Resetear todos a blanco primero
-      document.querySelectorAll('.tooth-poly').forEach(el => {
-          el.setAttribute('fill', '#ffffff');
-          el.removeAttribute('data-status');
-      });
+      // 1. Limpiar clases visuales previas
+      document.querySelectorAll('.tooth-group').forEach(g => g.className.baseVal = 'tooth-group');
+      document.querySelectorAll('.tooth-surface').forEach(s => s.classList.remove('state-caries', 'state-resina', 'state-sellante'));
 
-      // 2. Pintar estado actual
+      // 2. Aplicar estado desde mouthState
       Object.keys(mouthState).forEach(key => {
           const status = mouthState[key];
-          const el = document.querySelector(`.tooth-poly[data-key="${key}"]`);
+          const [toothNum, part] = key.split('_');
           
-          if (el) {
-              el.setAttribute('data-status', status);
-              
-              // 🔥 FUERZA BRUTA VISUAL: Asignar color directo al atributo fill
-              let color = '#ffffff';
-              if(status === 'caries') color = '#ef4444';
-              if(status === 'resina') color = '#3b82f6';
-              if(status === 'corona') color = '#facc15';
-              if(status === 'ausente') color = '#1f2937';
-              if(status === 'endodoncia') color = '#a855f7';
-              
-              el.setAttribute('fill', color);
+          const group = document.getElementById(`tooth-${toothNum}`);
+          if (!group) return;
+
+          // Estados que afectan a TODO el diente (Capas)
+          if (['ausente', 'corona', 'endodoncia', 'implante'].includes(status)) {
+              if (status === 'ausente') group.classList.add('has-ausente');
+              if (status === 'corona') group.classList.add('has-corona');
+              if (status === 'endodoncia') group.classList.add('has-endodoncia');
+              if (status === 'implante') group.classList.add('has-implante');
+          } 
+          // Estados de Superficie (Caras)
+          else {
+              const selectorPart = part || 'center'; 
+              const surface = group.querySelector(`[data-part="${selectorPart}"]`);
+              if (surface) {
+                  if (status === 'caries') surface.classList.add('state-caries');
+                  if (status === 'resina') surface.classList.add('state-resina');
+                  if (status === 'sellante') surface.classList.add('state-sellante');
+              }
           }
       });
   }
-
   function attachToothListeners() {
-    document.querySelectorAll('.tooth-poly').forEach(poly => {
-        poly.addEventListener('click', async (e) => {
-            const el = e.target;
-            const key = el.dataset.key; 
-            const toothId = el.parentElement?.dataset.tooth;
-            
-            const currentStatus = el.getAttribute('data-status') || 'sano';
-            
-            const { value: status } = await Swal.fire({
-                title: `🦷 Diente ${toothId}`,
-                text: 'Selecciona el estado:',
-                input: 'select',
-                inputOptions: { 
-                    'sano': '⚪ Sano', 
-                    'caries': '🔴 Caries', 
-                    'resina': '🔵 Resina/Obturado', 
-                    'corona': '🟡 Corona', 
-                    'endodoncia': '🟣 Endodoncia', 
-                    'ausente': '⚫ Ausente' 
-                },
-                inputValue: currentStatus, // 🎯 Pre-seleccionar el estado actual
-                showCancelButton: true,
-                confirmButtonColor: 'rgb(var(--color-brand))',
-                confirmButtonText: 'Aplicar'
-            });
+    const canvas = document.getElementById('odontogram-canvas');
+    // Limpiar listener previo asignando null antes (simple safety)
+    canvas.onclick = null;
+    
+    canvas.onclick = async (e) => {
+        const target = e.target;
+        const group = target.closest('.tooth-group');
+        if (!group) return;
 
-            if (status !== undefined) { // Permitir cambiar a "sano"
-                if (status === 'sano') { 
-                    delete mouthState[key || '']; 
-                    el.removeAttribute('data-status'); 
-                } else { 
-                    mouthState[key || ''] = status; 
-                    el.setAttribute('data-status', status); 
-                }
-                
-                // 🎯 FEEDBACK INMEDIATO: Mostrar badge temporal
-                showChangeIndicator();
-                detectProblems();
+        const toothId = group.dataset.tooth;
+        const part = target.dataset.part || 'center'; 
+        
+        const { value: selectedStatus } = await Swal.fire({
+            title: `Diente ${toothId} - ${part.toUpperCase()}`,
+            html: `
+                <div class="grid grid-cols-2 gap-2 text-left">
+                    <button class="swal-opt p-3 rounded border hover:bg-gray-50 flex items-center gap-2 font-bold text-gray-600" data-val="sano">⚪ Sano / Borrar</button>
+                    <button class="swal-opt p-3 rounded border border-red-200 bg-red-50 flex items-center gap-2 text-red-700 font-bold" data-val="caries"><span class="w-3 h-3 bg-red-500 rounded-full"></span> Caries</button>
+                    <button class="swal-opt p-3 rounded border border-blue-200 bg-blue-50 flex items-center gap-2 text-blue-700 font-bold" data-val="resina"><span class="w-3 h-3 bg-blue-500 rounded-full"></span> Resina</button>
+                    <button class="swal-opt p-3 rounded border border-green-200 bg-green-50 flex items-center gap-2 text-green-700 font-bold" data-val="sellante"><span class="w-3 h-3 bg-green-500 rounded-full"></span> Sellante</button>
+                    <div class="col-span-2 border-t my-1"></div>
+                    <button class="swal-opt col-span-2 p-2 rounded border border-gray-800 bg-gray-100 flex items-center gap-2 font-bold" data-val="ausente">❌ Ausente</button>
+                    <button class="swal-opt col-span-2 p-2 rounded border border-yellow-400 bg-yellow-50 flex items-center gap-2 font-bold text-yellow-800" data-val="corona">👑 Corona</button>
+                    <button class="swal-opt col-span-2 p-2 rounded border border-purple-300 bg-purple-50 flex items-center gap-2 font-bold text-purple-800" data-val="endodoncia">🟣 Endodoncia</button>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar',
+            didOpen: (popup) => {
+                popup.querySelectorAll('.swal-opt').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        Swal.close();
+                        handleStatusChange(toothId, part, btn.dataset.val);
+                    });
+                });
             }
         });
-    });
-}
+    };
+  }
+
+  // Helper para manejar el cambio (Agregar esta función nueva debajo de attachToothListeners)
+  function handleStatusChange(tooth, part, status) {
+      const key = `${tooth}_${part}`;
+      
+      if (status === 'sano') {
+          delete mouthState[key];
+          if (part === 'center') { // Si limpia centro, limpia estados globales
+             const globalStates = ['ausente', 'corona', 'endodoncia', 'implante'];
+             if(globalStates.includes(mouthState[`${tooth}_center`])) delete mouthState[`${tooth}_center`];
+          }
+      } else {
+          // Si es estado global, asignar a 'center'
+          if (['ausente', 'corona', 'endodoncia', 'implante'].includes(status)) {
+              mouthState[`${tooth}_center`] = status;
+          } else {
+              mouthState[key] = status;
+          }
+      }
+      updateVisuals(); 
+      detectProblems();
+      
+      // Activar botón guardar
+      const saveBtn = document.getElementById('save-odontogram-btn');
+      if (saveBtn) { saveBtn.classList.add('animate-pulse', 'ring-4', 'ring-teal-200'); saveBtn.innerHTML = '💾 Guardar Cambios *'; }
+  }
 
 // 🎯 NUEVA FUNCIÓN: Indicador de cambios pendientes
 function showChangeIndicator() {
@@ -894,33 +924,56 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
 
   // Ver Snapshot (Ver el gráfico del pasado)
   // Helper para generar SVG estático
-  const getStaticSvg = (state: any) => {
-      let svg = '<svg width="100%" height="250" viewBox="0 0 650 300" style="pointer-events: none;">';
-      const getColor = (num: any, part: any) => {
-          const status = state[`${num}_${part}`];
-          if(status === 'caries') return '#ef4444';
-          if(status === 'resina') return '#3b82f6';
-          if(status === 'corona') return '#facc15';
-          if(status === 'ausente') return '#1f2937';
-          if(status === 'endodoncia') return '#a855f7';
-          return '#ffffff';
-      }
-      const render = (num: any, x: any, y: any) => `
-        <g transform="translate(${x}, ${y})">
-            <text x="25" y="-5" style="font-size:10px; fill:#64748b; font-weight:bold; text-anchor:middle;">${num}</text>
-            <polygon points="0,0 50,0 35,15 15,15" fill="${getColor(num,'top')}" stroke="#94a3b8" stroke-width="1"></polygon>
-            <polygon points="0,50 50,50 35,35 15,35" fill="${getColor(num,'bottom')}" stroke="#94a3b8" stroke-width="1"></polygon>
-            <polygon points="0,0 0,50 15,35 15,15" fill="${getColor(num,'left')}" stroke="#94a3b8" stroke-width="1"></polygon>
-            <polygon points="50,0 50,50 35,35 35,15" fill="${getColor(num,'right')}" stroke="#94a3b8" stroke-width="1"></polygon>
-            <rect x="15" y="15" width="20" height="20" fill="${getColor(num,'center')}" stroke="#94a3b8" stroke-width="1"></rect>
-        </g>`;
-      quadrants[0].range.forEach((t, i) => { svg += render(t, i * 35, 20); });
-      quadrants[1].range.forEach((t, i) => { svg += render(t, 320 + (i * 35), 20); });
-      quadrants[2].range.forEach((t, i) => { svg += render(t, i * 35, 160); });
-      quadrants[3].range.forEach((t, i) => { svg += render(t, 320 + (i * 35), 160); });
+  // Helper para generar SVG estático (Snapshot Histórico)
+  const getStaticSvg = (state) => {
+      // Usamos un ancho fijo grande para el snapshot para asegurar calidad
+      let svg = '<svg width="950" height="350" viewBox="0 0 950 350" style="pointer-events: none; background: #f8fafc;">';
+      
+      const SPACING = 55; const GAP_MIDDLE = 40; const ROW_HEIGHT = 160;
+
+      // Función interna para renderizar un diente estático con su estado
+      const renderStaticTooth = (num, x, y) => {
+          // Determinar clases o estilos según el estado guardado
+          let polyClass = 'fill:white; stroke:#94a3b8; stroke-width:1;'; // Base
+          let layers = ''; // Capas adicionales (Corona, Ausente, etc.)
+
+          // Verificar estados globales (capas)
+          const centerState = state[`${num}_center`]; 
+          if(centerState === 'ausente') layers += `<g fill="#1f2937" opacity="0.8"><polygon points="${TOOTH_GEO.absent1}"/><polygon points="${TOOTH_GEO.absent2}"/></g>`;
+          if(centerState === 'corona') layers += `<circle cx="30" cy="30" r="18" fill="none" stroke="#eab308" stroke-width="3"/>`;
+          if(centerState === 'endodoncia') layers += `<circle cx="30" cy="30" r="10" fill="none" stroke="#a855f7" stroke-width="3"/>`;
+          if(centerState === 'implante') layers += `<polygon points="${TOOTH_GEO.implant}" fill="none" stroke="#475569" stroke-width="2"/>`;
+
+          // Función para color de cara específica
+          const getFaceColor = (part) => {
+              const s = state[`${num}_${part}`];
+              if(s === 'caries') return '#ef4444';
+              if(s === 'resina') return '#3b82f6';
+              if(s === 'sellante') return '#22c55e';
+              return 'white';
+          };
+
+          return `
+            <g transform="translate(${x}, ${y})">
+                <text x="30" y="-8" style="font-size:12px; font-weight:800; fill:#64748b; text-anchor:middle;">${num}</text>
+                <polygon points="${TOOTH_GEO.top}" fill="${getFaceColor('top')}" stroke="#94a3b8" stroke-width="1"></polygon>
+                <polygon points="${TOOTH_GEO.bottom}" fill="${getFaceColor('bottom')}" stroke="#94a3b8" stroke-width="1"></polygon>
+                <polygon points="${TOOTH_GEO.left}" fill="${getFaceColor('left')}" stroke="#94a3b8" stroke-width="1"></polygon>
+                <polygon points="${TOOTH_GEO.right}" fill="${getFaceColor('right')}" stroke="#94a3b8" stroke-width="1"></polygon>
+                <polygon points="${TOOTH_GEO.center}" fill="${getFaceColor('center')}" stroke="#94a3b8" stroke-width="1"></polygon>
+                ${layers}
+            </g>`;
+      };
+
+      // Dibujar los mismos cuadrantes
+      [18,17,16,15,14,13,12,11].forEach((t, i) => { svg += renderStaticTooth(t, i * SPACING + 10, 40); });
+      [21,22,23,24,25,26,27,28].forEach((t, i) => { svg += renderStaticTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, 40); });
+      [48,47,46,45,44,43,42,41].forEach((t, i) => { svg += renderStaticTooth(t, i * SPACING + 10, ROW_HEIGHT + 40); });
+      [31,32,33,34,35,36,37,38].forEach((t, i) => { svg += renderStaticTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, ROW_HEIGHT + 40); });
+
       svg += '</svg>';
       return svg;
-  }
+  };
 
   // Función global para ser llamada desde el timeline
   (window as any).viewOdontogramSnapshot = (recordJson: string) => {
@@ -1444,76 +1497,108 @@ function viewOdontogramSnapshot(record) {
 </script>
 
 <style>
-  /* Dientes más grandes y con mejor hover */
-  .tooth-poly { 
-    fill: #ffffff; 
-    stroke: #64748b; 
-    stroke-width: 2px; 
-    transition: all 0.3s ease; 
-    cursor: pointer; 
+  /* ==========================================
+     ODONTOGRAMA PREMIUM STYLES
+     ========================================== */
+  
+  /* Contenedor Responsive con Scroll Suave */
+  #odontogram-canvas {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 20px 10px;
+    background-color: #f8fafc; /* Slate-50 */
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
   }
   
-  .tooth-poly:hover { 
-    fill: #e2e8f0; 
-    stroke: #334155;
-    stroke-width: 3px;
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-  }
+  #odontogram-canvas::-webkit-scrollbar { height: 8px; }
+  #odontogram-canvas::-webkit-scrollbar-track { background: #f1f5f9; }
+  #odontogram-canvas::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+  /* Grupo Diente */
+  .tooth-group { cursor: pointer; transition: transform 0.1s; }
+  .tooth-group:active { transform: scale(0.95); }
   
   .tooth-label { 
-    font-size: 14px; 
+    font-size: 12px; 
     font-weight: 800; 
-    fill: #1e293b; 
+    fill: #64748b; 
     text-anchor: middle; 
     pointer-events: none; 
-  }
-  
-  /* Estados de dientes con sombras para mejor visibilidad */
-  .tooth-poly[data-status="caries"] { 
-    fill: #ef4444 !important; 
-    stroke: #b91c1c;
-    stroke-width: 3px;
-    filter: drop-shadow(0 2px 4px rgba(239, 68, 68, 0.4));
-  }
-  
-  .tooth-poly[data-status="resina"] { 
-    fill: #3b82f6 !important; 
-    stroke: #1d4ed8;
-    stroke-width: 3px;
-    filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
-  }
-  
-  .tooth-poly[data-status="corona"] { 
-    fill: #facc15 !important; 
-    stroke: #ca8a04;
-    stroke-width: 3px;
-    filter: drop-shadow(0 2px 4px rgba(250, 204, 21, 0.4));
-  }
-  
-  .tooth-poly[data-status="ausente"] { 
-    fill: #1f2937 !important; 
-    opacity: 0.7;
-    stroke: #0f172a;
-    stroke-width: 3px;
-  }
-  
-  .tooth-poly[data-status="endodoncia"] { 
-    fill: #a855f7 !important; 
-    stroke: #7e22ce;
-    stroke-width: 3px;
-    filter: drop-shadow(0 2px 4px rgba(168, 85, 247, 0.4));
+    user-select: none;
   }
 
-  /* Animaciones */
+  /* Polígonos (Caras) */
+  .tooth-surface {
+    fill: #ffffff;
+    stroke: #94a3b8;
+    stroke-width: 1px;
+    transition: all 0.2s ease;
+  }
+  .tooth-surface:hover { fill: #e2e8f0; stroke: #64748b; }
+
+  /* ==========================================
+     ESTADOS (Clases CSS)
+     ========================================== */
+  
+  /* CARIES (Rojo) */
+  .state-caries { fill: #ef4444 !important; stroke: #b91c1c; }
+  
+  /* RESINA / OBTURADO (Azul) */
+  .state-resina { fill: #3b82f6 !important; stroke: #1d4ed8; }
+  
+  /* SELLANTE (Verde) */
+  .state-sellante { fill: #22c55e !important; stroke: #15803d; }
+  
+  /* CORONA (Overlay Círculo) */
+  .layer-corona {
+    fill: none;
+    stroke: #eab308; /* Gold */
+    stroke-width: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .has-corona .layer-corona { opacity: 1; }
+  
+  /* ENDODONCIA (Overlay Centro) */
+  .layer-endo {
+    fill: none;
+    stroke: #a855f7; /* Purple */
+    stroke-width: 3px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .has-endodoncia .layer-endo { opacity: 1; }
+
+  /* AUSENTE (Overlay X + Opacidad Base) */
+  .layer-ausente {
+    fill: #1f2937;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .has-ausente .tooth-surface { opacity: 0.1; } 
+  .has-ausente .layer-ausente { opacity: 0.8; }
+
+  /* IMPLANTE (Overlay Estructura) */
+  .layer-implante {
+    fill: none;
+    stroke: #475569;
+    stroke-width: 2px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .has-implante .layer-implante { opacity: 1; }
+
+  /* Animaciones UI */
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  
   .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-  
-  /* Contenedor del odontograma con scroll horizontal en móvil */
-  #odontogram-canvas {
-    overflow-x: auto;
-    padding: 20px;
-  }
+  .swal-opt:hover { background-color: #f3f4f6; }
 </style>
