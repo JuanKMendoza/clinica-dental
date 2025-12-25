@@ -217,6 +217,12 @@ const age = calculateAge(patient.birth_date);
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg> 
                                 Guardar Cambios
                             </button>
+                            <button
+                            id="view-history-btn"
+                            class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm border hover:bg-slate-200 transition-all flex items-center gap-2"
+                            >
+                            📜 Ver Historial
+                            </button>
                         </div>
                     </div>
 
@@ -1169,8 +1175,29 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
 function viewOdontogramSnapshot(record) {
     const state = record.data || {};
     
+    const TOOTH_SIZE = 50;
+    const TOOTH_SPACING = 70;
+    const START_X = 20;
+    const GAP_MIDDLE = 140;
+
+    const ROW_TOP = 40;
+    const ROW_BOTTOM = 220;
+
+    const SVG_WIDTH = 1280;
+    const SVG_HEIGHT = 400;
+
+    
+    
     // Generar SVG estático (solo lectura)
-    let svg = '<svg width="100%" height="400" viewBox="0 0 700 400" style="pointer-events: none;">';
+    let svg = `
+    <svg 
+      width="${SVG_WIDTH}" 
+      height="${SVG_HEIGHT}" 
+      viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}"
+      style="pointer-events:none; display:block;"
+    >
+    `;
+
     
     const getColor = (num, part) => {
         const key = `${num}_${part}`;
@@ -1193,10 +1220,29 @@ function viewOdontogramSnapshot(record) {
             <rect x="15" y="15" width="20" height="20" fill="${getColor(num,'center')}" stroke="#64748b" stroke-width="2"></rect>
         </g>`;
     
-    [18,17,16,15,14,13,12,11].forEach((t, i) => svg += renderStaticTooth(t, i * 70, 40));
-    [21,22,23,24,25,26,27,28].forEach((t, i) => svg += renderStaticTooth(t, 560 + (i * 70), 40));
-    [48,47,46,45,44,43,42,41].forEach((t, i) => svg += renderStaticTooth(t, i * 70, 220));
-    [31,32,33,34,35,36,37,38].forEach((t, i) => svg += renderStaticTooth(t, 560 + (i * 70), 220));
+    [18,17,16,15,14,13,12,11].forEach((t, i) =>
+    svg += renderStaticTooth(t, START_X + i * TOOTH_SPACING, ROW_TOP)
+);
+
+[21,22,23,24,25,26,27,28].forEach((t, i) =>
+    svg += renderStaticTooth(
+        t,
+        START_X + (8 * TOOTH_SPACING) + GAP_MIDDLE + i * TOOTH_SPACING,
+        ROW_TOP
+    )
+);
+
+[48,47,46,45,44,43,42,41].forEach((t, i) =>
+    svg += renderStaticTooth(t, START_X + i * TOOTH_SPACING, ROW_BOTTOM)
+);
+
+[31,32,33,34,35,36,37,38].forEach((t, i) =>
+    svg += renderStaticTooth(
+        t,
+        START_X + (8 * TOOTH_SPACING) + GAP_MIDDLE + i * TOOTH_SPACING,
+        ROW_BOTTOM
+    )
+);
 
     
     svg += '</svg>';
@@ -1206,18 +1252,27 @@ function viewOdontogramSnapshot(record) {
     });
     
     Swal.fire({
-        title: `📸 Snapshot del ${date}`,
-        html: `
-            <p class="text-sm text-gray-500 mb-4">Por: Dr. ${record.dentists?.name || 'Sin asignar'}</p>
-            <div class="overflow-x-auto bg-gray-50 p-4 rounded-xl border border-gray-200">
-                ${svg}
-            </div>
-        `,
-        width: '800px',
-        showConfirmButton: true,
-        confirmButtonText: 'Cerrar',
-        confirmButtonColor: '#334155'
-    });
+  title: `📸 Snapshot del ${date}`,
+  html: `
+    <p class="text-sm text-gray-500 mb-4">
+      Por: Dr. ${record.dentists?.name || 'Sin asignar'}
+    </p>
+
+    <div
+      class="bg-gray-50 p-4 rounded-xl border border-gray-200"
+        style="overflow-x:auto; max-width:100%; padding-left:20px;"
+    >
+      <div style="min-width:1280px;">
+        ${svg}
+      </div>
+    </div>
+  `,
+  width: '800px',
+  showConfirmButton: true,
+  confirmButtonText: 'Cerrar',
+  confirmButtonColor: '#334155'
+});
+
 }
 
   // Render inicial con pequeño delay para asegurar DOM
