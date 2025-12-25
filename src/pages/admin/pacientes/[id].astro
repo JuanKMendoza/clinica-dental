@@ -1211,106 +1211,51 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
 // Función para ver snapshot histórico
 function viewOdontogramSnapshot(record) {
     const state = record.data || {};
-    
-    const TOOTH_SIZE = 50;
-    const TOOTH_SPACING = 70;
-    const START_X = 20;
-    const GAP_MIDDLE = 140;
 
-    const ROW_TOP = 40;
-    const ROW_BOTTOM = 220;
+    // Guardar estado actual
+    const previousState = { ...mouthState };
 
-    const SVG_WIDTH = 1280;
-    const SVG_HEIGHT = 400;
+    // Cargar estado histórico
+    mouthState = { ...state };
 
-    
-    
-    // Generar SVG estático (solo lectura)
-    let svg = `
-    <svg 
-      width="${SVG_WIDTH}" 
-      height="${SVG_HEIGHT}" 
-      viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}"
-      style="pointer-events:none; display:block;"
-    >
-    `;
+    // Forzar render correcto con el motor premium
+    initOdontogram();
+    updateVisuals();
 
-    
-    const getColor = (num, part) => {
-        const key = `${num}_${part}`;
-        const status = state[key];
-        if (status === 'caries') return '#ef4444';
-        if (status === 'resina') return '#3b82f6';
-        if (status === 'corona') return '#facc15';
-        if (status === 'ausente') return '#1f2937';
-        if (status === 'endodoncia') return '#a855f7';
-        return '#ffffff';
-    };
-    
-    const renderStaticTooth = (num, x, y) => `
-        <g transform="translate(${x}, ${y})">
-            <text x="25" y="-5" style="font-size:14px; fill:#1e293b; font-weight:bold; text-anchor:middle;">${num}</text>
-            <polygon points="0,0 50,0 35,15 15,15" fill="${getColor(num,'top')}" stroke="#64748b" stroke-width="2"></polygon>
-            <polygon points="0,50 50,50 35,35 15,35" fill="${getColor(num,'bottom')}" stroke="#64748b" stroke-width="2"></polygon>
-            <polygon points="0,0 0,50 15,35 15,15" fill="${getColor(num,'left')}" stroke="#64748b" stroke-width="2"></polygon>
-            <polygon points="50,0 50,50 35,35 35,15" fill="${getColor(num,'right')}" stroke="#64748b" stroke-width="2"></polygon>
-            <rect x="15" y="15" width="20" height="20" fill="${getColor(num,'center')}" stroke="#64748b" stroke-width="2"></rect>
-        </g>`;
-    
-    [18,17,16,15,14,13,12,11].forEach((t, i) =>
-    svg += renderStaticTooth(t, START_X + i * TOOTH_SPACING, ROW_TOP)
-);
+    // Clonar el SVG ya renderizado
+    const svg = document
+        .querySelector('#odontogram-canvas svg')
+        ?.outerHTML;
 
-[21,22,23,24,25,26,27,28].forEach((t, i) =>
-    svg += renderStaticTooth(
-        t,
-        START_X + (8 * TOOTH_SPACING) + GAP_MIDDLE + i * TOOTH_SPACING,
-        ROW_TOP
-    )
-);
+    // Restaurar estado original
+    mouthState = previousState;
+    initOdontogram();
+    updateVisuals();
 
-[48,47,46,45,44,43,42,41].forEach((t, i) =>
-    svg += renderStaticTooth(t, START_X + i * TOOTH_SPACING, ROW_BOTTOM)
-);
-
-[31,32,33,34,35,36,37,38].forEach((t, i) =>
-    svg += renderStaticTooth(
-        t,
-        START_X + (8 * TOOTH_SPACING) + GAP_MIDDLE + i * TOOTH_SPACING,
-        ROW_BOTTOM
-    )
-);
-
-    
-    svg += '</svg>';
-    
-    const date = new Date(record.created_at).toLocaleDateString('es-CO', { 
-        day: 'numeric', month: 'long', year: 'numeric' 
+    const date = new Date(record.created_at).toLocaleDateString('es-CO', {
+        day: 'numeric', month: 'long', year: 'numeric'
     });
-    
+
     Swal.fire({
-  title: `📸 Snapshot del ${date}`,
-  html: `
-    <p class="text-sm text-gray-500 mb-4">
-      Por: Dr. ${record.dentists?.name || 'Sin asignar'}
-    </p>
+        title: `📸 Snapshot del ${date}`,
+        html: `
+            <p class="text-sm text-gray-500 mb-4">
+              Por: Dr. ${record.dentists?.name || 'Sin asignar'}
+            </p>
 
-    <div
-      class="bg-gray-50 p-4 rounded-xl border border-gray-200"
-        style="overflow-x:auto; max-width:100%; padding-left:20px;"
-    >
-      <div style="min-width:1280px;">
-        ${svg}
-      </div>
-    </div>
-  `,
-  width: '800px',
-  showConfirmButton: true,
-  confirmButtonText: 'Cerrar',
-  confirmButtonColor: '#334155'
-});
-
+            <div
+              class="bg-gray-50 p-4 rounded-xl border border-gray-200"
+              style="overflow-x:auto; max-width:100%;"
+            >
+              ${svg}
+            </div>
+        `,
+        width: '900px',
+        confirmButtonText: 'Cerrar',
+        confirmButtonColor: '#334155'
+    });
 }
+
 
   // Render inicial con pequeño delay para asegurar DOM
   setTimeout(() => {
