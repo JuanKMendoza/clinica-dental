@@ -516,33 +516,70 @@ const age = calculateAge(patient.birth_date);
   function initOdontogram() {
     const canvas = document.getElementById('odontogram-canvas');
     if (!canvas) return;
-    
-    const SVG_WIDTH = 950; 
-    let svgContent = `<svg width="${SVG_WIDTH}" height="350" viewBox="0 0 ${SVG_WIDTH} 350" style="min-width: ${SVG_WIDTH}px; display: block;">`;
-    
-    const SPACING = 55;
-    const GAP_MIDDLE = 40; 
+
+    // 🔢 Medidas reales del odontograma
+    const TOOTH_REAL_WIDTH = 60;       // ancho real del diente (tu geometría)
+    const SPACING = TOOTH_REAL_WIDTH + 5;
+
+    const START_X = 40;
+    const GAP_MIDDLE = 50;
     const ROW_HEIGHT = 160;
 
-    [18,17,16,15,14,13,12,11].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, 40); });
-    [21,22,23,24,25,26,27,28].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, 40); });
-    [48,47,46,45,44,43,42,41].forEach((t, i) => { svgContent += renderTooth(t, i * SPACING + 10, ROW_HEIGHT + 40); });
-    [31,32,33,34,35,36,37,38].forEach((t, i) => { svgContent += renderTooth(t, (i * SPACING) + (8 * SPACING) + GAP_MIDDLE, ROW_HEIGHT + 40); });
+    // 📐 ANCHO CALCULADO (NO fijo)
+    const SVG_WIDTH =
+        START_X +
+        (8 * SPACING) +
+        GAP_MIDDLE +
+        (8 * SPACING) +
+        START_X;
+
+    let svgContent = `
+<svg
+  width="${SVG_WIDTH}"
+  height="350"
+  viewBox="0 0 ${SVG_WIDTH} 350"
+  style="min-width:${SVG_WIDTH}px; display:block;"
+>
+`;
+
+            [18,17,16,15,14,13,12,11].forEach((t, i) => {
+        svgContent += renderTooth(t, START_X + i * SPACING, 40);
+        });
+
+        [21,22,23,24,25,26,27,28].forEach((t, i) => {
+        svgContent += renderTooth(
+            t,
+            START_X + (8 * SPACING) + GAP_MIDDLE + i * SPACING,
+            40
+        );
+        });
+
+        [48,47,46,45,44,43,42,41].forEach((t, i) => {
+        svgContent += renderTooth(t, START_X + i * SPACING, ROW_HEIGHT + 40);
+        });
+
+        [31,32,33,34,35,36,37,38].forEach((t, i) => {
+        svgContent += renderTooth(
+            t,
+            START_X + (8 * SPACING) + GAP_MIDDLE + i * SPACING,
+            ROW_HEIGHT + 40
+        );
+        });
+
     
     svgContent += '</svg>';
     canvas.innerHTML = `
-        <div class="odontogram-inner">
-            ${svgContent}
-        </div>
+        <div
+  class="odontogram-inner"
+  style="overflow-x:auto; width:100%;"
+>
+  <div style="width:${SVG_WIDTH}px">
+    ${svgContent}
+  </div>
+</div>
         `;
 
-        // 🧠 Centrar el odontograma automáticamente
-    requestAnimationFrame(() => {
-    const c = document.getElementById('odontogram-canvas');
-    if (c) {
-        c.scrollLeft = (c.scrollWidth - c.clientWidth) / 2;
-    }
-    });
+    
     
     updateVisuals();
     attachToothListeners();
