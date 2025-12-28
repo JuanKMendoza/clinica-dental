@@ -422,6 +422,12 @@ const age = calculateAge(patient.birth_date);
       });
   }
 
+  declare global {
+  interface Window {
+    viewOdontogramSnapshot: (recordJson: string) => void;
+  }
+}
+
   // ==========================================
   // 2. LÓGICA DE PESTAÑAS (TABS)
   // ==========================================
@@ -454,7 +460,7 @@ const age = calculateAge(patient.birth_date);
       
       // Si cambiamos al tab de Odontograma, asegurarnos que el canvas se vea bien
       if(targetId === 'tab-odontogram') {
-          setTimeout(() => initOdontogram(), 50); 
+          updateVisuals();
       }
   }
 
@@ -467,7 +473,7 @@ const age = calculateAge(patient.birth_date);
   });
 
   // Activar primera tab por defecto al cargar
-  switchTab('tab-history');
+  //switchTab('tab-history');
 
 
  // ==========================================
@@ -580,8 +586,6 @@ const age = calculateAge(patient.birth_date);
         `;
 
     
-    
-    updateVisuals();
     attachToothListeners();
     detectProblems();
   }
@@ -1204,64 +1208,11 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
 
     if (selectedIndex !== undefined) {
         const selected = odontogramRecords[selectedIndex];
-        viewOdontogramSnapshot(selected);
+        window.viewOdontogramSnapshot(
+        encodeURIComponent(JSON.stringify(selected))
+        );
     }
 });
-
-// Función para ver snapshot histórico
-function viewOdontogramSnapshot(record) {
-    const state = record.data || {};
-
-    // Guardar estado actual
-    const previousState = { ...mouthState };
-
-    // Cargar estado histórico
-    mouthState = { ...state };
-
-    // Forzar render correcto con el motor premium
-    initOdontogram();
-    updateVisuals();
-
-    // Clonar el SVG ya renderizado
-    const svg = document
-        .querySelector('#odontogram-canvas svg')
-        ?.outerHTML;
-
-    // Restaurar estado original
-    mouthState = previousState;
-    initOdontogram();
-    updateVisuals();
-
-    const date = new Date(record.created_at).toLocaleDateString('es-CO', {
-        day: 'numeric', month: 'long', year: 'numeric'
-    });
-
-    Swal.fire({
-        title: `📸 Snapshot del ${date}`,
-        html: `
-            <p class="text-sm text-gray-500 mb-4">
-              Por: Dr. ${record.dentists?.name || 'Sin asignar'}
-            </p>
-
-            <div
-              class="bg-gray-50 p-4 rounded-xl border border-gray-200"
-              style="overflow-x:auto; max-width:100%;"
-            >
-              ${svg}
-            </div>
-        `,
-        width: '900px',
-        confirmButtonText: 'Cerrar',
-        confirmButtonColor: '#334155'
-    });
-}
-
-
-  // Render inicial con pequeño delay para asegurar DOM
-  setTimeout(() => {
-      initOdontogram();
-      renderTimeline();
-  }, 100);
 
   // 🎯 ACCIONES DE TRATAMIENTOS (Delegación de eventos)
 // 🎯 ACCIONES DE TRATAMIENTOS (Delegación de eventos UNIFICADA)
@@ -1562,6 +1513,34 @@ function viewOdontogramSnapshot(record) {
       const result = await Swal.fire({ title: '⚠️ ¿ELIMINAR?', text: "Se borrará todo el historial.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí, borrar' });
       if (result.isConfirmed) { const { error } = await supabase.from('patients').delete().eq('id', patientId); if (error) Swal.fire('Error', error.message, 'error'); else window.location.href = '/admin/pacientes'; }
   });
+
+// ==========================================
+// 🚀 BOOTSTRAPPER / CICLO DE VIDA CENTRAL
+// ==========================================
+function mountApplication() {
+    // 1. Inicializar odontograma (UNA sola vez)
+    initOdontogram();
+
+    // 2. Aplicar estado visual después del primer frame
+    requestAnimationFrame(() => {
+        updateVisuals();
+    });
+
+    // 3. Renderizar timeline
+    renderTimeline();
+
+    // 4. Activar tab inicial
+    switchTab('tab-history');
+}
+
+// Esperar DOM listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountApplication);
+} else {
+    mountApplication();
+}
+
+
 </script>
 
 <style>
