@@ -30,6 +30,7 @@ const { data: attachments } = await supabase.from("patient_attachments").select(
 // 🔥 NUEVO: Cargar Odontograma Maestro y Planes de Tratamiento
 const { data: masterOdontogram } = await supabase.from("odontogram_master").select("*").eq("patient_id", id).single();
 const { data: treatmentPlans } = await supabase.from("treatment_plans").select(`*, dentists (name), services (name)`).eq("patient_id", id).order("created_at", { ascending: false });
+const hasApprovedPlan = treatmentPlans?.some(t => t.status === 'approved') || false;
 
 // Calcular Presupuestos (SSR)
 const pendingTreatments = treatmentPlans?.filter(t => t.status === 'pending') || [];
@@ -51,6 +52,11 @@ const calculateAge = (birthDateString: string) => {
   return age;
 };
 const age = calculateAge(patient.birth_date);
+
+// utils/money.ts
+export const formatCOP = (value: number | string) =>
+  `$${Number(value || 0).toLocaleString('es-CO')}`;
+
 ---
 
 <AdminLayout title={`Historia Clínica - ${patient.full_name}`}>
@@ -246,6 +252,22 @@ const age = calculateAge(patient.birth_date);
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
                     <div id="odontogram-canvas" class="min-w-[600px] flex flex-col gap-8 items-center select-none"></div>
                 </div>
+
+                <!-- 🔍 HALLAZGOS DETECTADOS AUTOMÁTICAMENTE -->
+                <div 
+                id="findings-panel"
+                class="mt-6 space-y-3 hidden"
+                >
+                </div>
+
+                <!-- 🔮 PLAN PROPUESTO AUTOMÁTICO (NO PERSISTIDO) -->
+                <div 
+                id="auto-treatment-plan"
+                class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 hidden"
+                >
+                <!-- JS renderiza aquí -->
+                </div>
+
                 
                 <!-- PLAN DE TRATAMIENTO & PRESUPUESTO -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
@@ -269,7 +291,7 @@ const age = calculateAge(patient.birth_date);
                                     <p class="text-xs text-orange-600">{pendingTreatments.length} procedimientos</p>
                                 </div>
                             </div>
-                            <span class="text-2xl font-bold text-orange-900">${totalPendingCost.toFixed(2)}</span>
+                            <span class="text-2xl font-bold text-orange-900">{formatCOP(totalPendingCost)}</span>
                         </div>
                     )}
 
@@ -287,7 +309,7 @@ const age = calculateAge(patient.birth_date);
                                             <p class="text-sm text-gray-600 mt-1"><strong>Dx:</strong> {t.diagnosis}</p>
                                         </div>
                                         <div class="text-right">
-                                            <p class="text-lg font-bold text-gray-900">${parseFloat(t.estimated_cost).toFixed(2)}</p>
+                                            <p class="text-lg font-bold text-gray-900">{formatCOP(t.estimated_cost)}</p>
                                         </div>
                                     </div>
                                     
@@ -409,6 +431,18 @@ const age = calculateAge(patient.birth_date);
   const masterOdontogramData = JSON.parse(pageData?.dataset.masterOdontogram || 'null');
   // Inicializamos el estado con lo que viene de la BD (Capa 1)
   let mouthState = masterOdontogramData?.teeth_state || {};
+  // ==========================================
+    // 🧠 MOTOR CLÍNICO — FUENTE DE VERDAD
+    // ==========================================
+    const clinicalEngineState = {
+    findings: [],
+    problems: [],
+    hasApprovedPlan: false
+    };
+
+    // 🔍 Exponer SOLO para debug
+    (window as any).clinicalEngineState = clinicalEngineState;
+
   
 
   // Llenar filtro de doctores en el Header de Evoluciones
@@ -427,6 +461,11 @@ const age = calculateAge(patient.birth_date);
     viewOdontogramSnapshot: (recordJson: string) => void;
   }
 }
+
+// utils/money.ts
+export const formatCOP = (value: number | string) =>
+  `$${Number(value || 0).toLocaleString('es-CO')}`;
+
 
   // ==========================================
   // 2. LÓGICA DE PESTAÑAS (TABS)
@@ -708,79 +747,177 @@ const age = calculateAge(patient.birth_date);
       if (saveBtn) { saveBtn.classList.add('animate-pulse', 'ring-4', 'ring-teal-200'); saveBtn.innerHTML = '💾 Guardar Cambios *'; }
   }
 
+
+  
 // 🎯 NUEVA FUNCIÓN: Indicador de cambios pendientes
-function showChangeIndicator() {
-    const saveBtn = document.getElementById('save-odontogram-btn');
-    if (saveBtn && !saveBtn.classList.contains('animate-pulse')) {
-        saveBtn.classList.add('animate-pulse', 'ring-4', 'ring-amber-300');
-        
-        // Agregar badge de cambios pendientes
-        if (!document.getElementById('changes-badge')) {
-            const badge = document.createElement('span');
-            badge.id = 'changes-badge';
-            badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full';
-            badge.textContent = '●';
-            saveBtn.style.position = 'relative';
-            saveBtn.appendChild(badge);
-        }
-    }
+function detectProblems() {
+
+    
+    const findingsMap = {};
+
+    const rules = {
+        caries: { text: 'Caries detectada', priority: 'urgent', serviceKey: 'Resinas' },
+        corona: { text: 'Reemplazo de corona', priority: 'normal', serviceKey: 'Prótesis' },
+        ausente: { text: 'Diente ausente', priority: 'normal', serviceKey: 'Implantes' },
+        endodoncia: { text: 'Tratamiento de conducto', priority: 'urgent', serviceKey: 'Endodoncia' }
+    };
+
+    Object.entries(mouthState).forEach(([key, value]) => {
+        if (!rules[value]) return;
+
+        const [tooth] = key.split('_');
+
+        // ⛔ evita duplicados por superficie
+        if (findingsMap[tooth]) return;
+
+        const rule = rules[value];
+
+        findingsMap[tooth] = {
+            tooth,
+            type: value,
+            description: rule.text,
+            priority: rule.priority,
+            serviceKey: rule.serviceKey
+        };
+    });
+
+    const findings = Object.values(findingsMap);
+    const enrichedFindings = resolveServices(findings, services);
+
+    // 🧠 FUENTE DE VERDAD
+    clinicalEngineState.findings = enrichedFindings;
+    clinicalEngineState.problems = mapFindingsToProblems(enrichedFindings);
+
+    // 🖥 UI EXISTENTE (no se toca)
+    renderFindings(enrichedFindings);
+
+    // 🔥 NUEVO: resumen inferior SIEMPRE sincronizado
+    renderTreatmentPlanSummary();
 }
 
-// 🎯 DETECTAR PROBLEMAS (CON PRECIOS DINÁMICOS)
-  function detectProblems() {
-      const problems = [];
-      
-      // Configuración: Qué buscar en tus servicios según el hallazgo
-      const logic = {
-          'caries': { search: 'Resina', defaultCost: 80, priority: 'urgent', text: 'Caries detectada' },
-          'corona': { search: 'Corona', defaultCost: 350, priority: 'normal', text: 'Reemplazo Corona' },
-          'ausente': { search: 'Implante', defaultCost: 800, priority: 'normal', text: 'Diente Ausente' },
-          'endodoncia': { search: 'Endodoncia', defaultCost: 200, priority: 'urgent', text: 'Tratamiento conducto' }
-      };
 
-      Object.keys(mouthState).forEach(key => {
-          const status = mouthState[key];
-          const tooth = key.split('_')[0];
-          const rule = logic[status];
-          
-          if (rule) {
-              // Buscar precio real en la lista de servicios del negocio
-              const realService = services.find((s:any) => s.name.toLowerCase().includes(rule.search.toLowerCase()));
-              
-              problems.push({ 
-                  tooth, 
-                  issue: rule.text, 
-                  priority: rule.priority, 
-                  treatment: realService ? realService.name : rule.search, // Nombre real o genérico
-                  service_id: realService ? realService.id : null, // ID para vincular
-                  cost: realService ? parseFloat(realService.price) : rule.defaultCost // Precio real o default
-              });
-          }
-      });
 
-      const alertBox = document.getElementById('clinical-alerts');
-      if (alertBox) {
-          if (problems.length === 0) {
-              alertBox.classList.add('hidden');
-          } else {
-              alertBox.classList.remove('hidden');
-              const total = problems.reduce((sum, p) => sum + p.cost, 0);
-              
-              alertBox.innerHTML = `
-                  <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg flex justify-between items-center animate-fade-in">
-                      <div>
-                          <h4 class="font-bold text-amber-900 text-sm">⚠️ ${problems.length} Hallazgos Clínicos</h4>
-                          <p class="text-xs text-amber-800">Plan sugerido: <strong>$${total.toFixed(2)}</strong></p>
-                      </div>
-                      <button id="auto-plan-btn" class="px-3 py-1.5 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 shadow-sm transition-all">
-                          ✨ Crear Plan
-                      </button>
-                  </div>
-              `;
-              document.getElementById('auto-plan-btn')?.addEventListener('click', () => createAutoPlan(problems));
-          }
-      }
+function resolveServices(findings, services) {
+    return findings.map(f => {
+        const service = services.find(s =>
+            s.name.toLowerCase().includes(f.serviceKey.toLowerCase())
+        );
+
+        return {
+            ...f,
+            serviceId: service?.id || null,
+            serviceName: service?.name || 'Servicio no configurado',
+            price: service ? Number(service.price) : 0
+        };
+    });
+}
+
+function mapFindingsToProblems(findings) {
+    return findings.map(f => ({
+        tooth: f.tooth,
+        issue: f.description,
+        treatment: f.serviceName,
+        priority: f.priority,
+        cost: f.price
+    }));
+}
+
+function createTreatmentPlanFromFindings(findings) {
+  const problems = mapFindingsToProblems(findings);
+
+  console.log('🧠 Plan generado automáticamente:', problems);
+  clinicalEngineState.problems = problems;
+  renderTreatmentPlanSummary(); 
+
+  if (!problems.length) {
+    Swal.fire('Sin tratamientos', 'No hay hallazgos válidos para crear un plan', 'info');
+    return;
   }
+
+  createAutoPlan(problems);
+}
+
+
+function renderFindings(findings) {
+  const container = document.getElementById('clinical-alerts');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!findings.length) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+
+  const urgentCount = findings.filter(f => f.priority === 'urgent').length;
+  const totalCost = findings.reduce((sum, f) => sum + (f.price || 0), 0);
+
+  container.innerHTML = `
+    <div class="flex justify-between items-center bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div>
+        <p class="text-sm font-bold text-amber-800">
+          🔍 Hallazgos detectados: ${findings.length}
+        </p>
+        <p class="text-xs text-amber-600">
+          ${urgentCount} urgentes · Presupuesto estimado
+        </p>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-xl font-bold text-amber-900">
+          $${totalCost.toLocaleString('es-CO')}
+        </span>
+
+        <button
+          id="auto-create-treatment-btn"
+          class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition"
+        >
+          Crear plan
+        </button>
+      </div>
+    </div>
+  `;
+
+  // 🔥 CONEXIÓN REAL
+  document
+    .getElementById('auto-create-treatment-btn')
+    ?.addEventListener('click', () => {
+      createTreatmentPlanFromFindings(findings);
+    });
+}
+
+
+function renderTreatmentPlanSummary() {
+  const container = document.getElementById('treatment-plan-summary');
+  if (!container) return;
+
+  const problems = clinicalEngineState.problems;
+
+  if (!problems.length) {
+    container.innerHTML = `
+      <p class="text-sm text-gray-400 italic">
+        No hay tratamientos propuestos aún
+      </p>
+    `;
+    return;
+  }
+
+  const totalCost = problems.reduce((sum, p) => sum + (p.cost || 0), 0);
+
+  container.innerHTML = `
+    <div class="flex justify-between items-center">
+      <p class="text-sm font-bold text-gray-700">
+        ${problems.length} tratamientos propuestos
+      </p>
+      <p class="text-lg font-extrabold text-brand-600">
+        $${totalCost.toLocaleString('es-CO')}
+      </p>
+    </div>
+  `;
+}
+
 
   // Llamar a detectProblems() dentro de initOdontogram() y en los clicks de los dientes
 // ==========================================
@@ -798,14 +935,14 @@ function showChangeIndicator() {
                       ${problems.map(p => `
                           <li class="flex justify-between items-center p-2 bg-gray-50 rounded">
                               <span>🦷 ${p.tooth} - ${p.treatment}</span>
-                              <span class="font-bold">$${p.cost}</span>
+                              <span class="font-bold">${formatCOP(p.cost)}</span>
                           </li>
                       `).join('')}
                   </ul>
                   <div class="mt-4 pt-3 border-t border-gray-200">
                       <div class="flex justify-between font-bold text-lg">
                           <span>Total:</span>
-                          <span class="text-brand-600">$${problems.reduce((sum, p) => sum + p.cost, 0)}</span>
+                          <span class="text-brand-600">${formatCOP(problems.reduce((sum, p) => sum + p.cost, 0))}</span>
                       </div>
                   </div>
               </div>
