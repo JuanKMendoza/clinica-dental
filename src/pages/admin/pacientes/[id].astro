@@ -276,10 +276,20 @@ export const formatCOP = (value: number | string) =>
                             <h3 class="font-bold text-gray-800 text-lg">Plan de Tratamiento</h3>
                             <p class="text-xs text-gray-500">Presupuesto y procedimientos</p>
                         </div>
-                        <button id="create-treatment-plan-btn" class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-brand-700 transition-all flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg> 
-                            Agregar Manual
-                        </button>
+
+                        <div class="flex gap-2">
+                            <button id="create-treatment-plan-btn"
+                                class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-brand-700 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" ...></svg>
+                                Agregar Manual
+                            </button>
+
+                            <!-- 🧠 NUEVO BOTÓN -->
+                            <button id="approve-plan-btn"
+                                class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-emerald-700 transition-all flex items-center gap-2 hidden">
+                                ✔ Aprobar Plan
+                            </button>
+                        </div>
                     </div>
                     
                     {pendingTreatments.length > 0 && (
@@ -314,18 +324,36 @@ export const formatCOP = (value: number | string) =>
                                     </div>
                                     
                                     <!-- Botones de Acción Rápida -->
-                                    {t.status === 'pending' && (
+                                        {['draft','pending'].includes(t.status) && !hasApprovedPlan && (
                                         <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200/50">
-                                            <button class="flex-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors schedule-treatment-btn" 
-                                            data-id={t.id} 
-                                            data-service-id={t.services?.id || ''} 
-                                            data-service-name={t.services?.name || ''} 
-                                            data-dentist-id={t.dentist_id || ''}>
+                                            
+                                            <button
+                                            class="flex-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors schedule-treatment-btn"
+                                            data-id={t.id}
+                                            data-service-id={t.services?.id || ''}
+                                            data-service-name={t.services?.name || ''}
+                                            data-dentist-id={t.dentist_id || ''}
+                                            >
                                             📅 Agendar
-                                        </button>
-                                            <button class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 delete-treatment-btn" data-id={t.id}>🗑️</button>
+                                            </button>
+
+                                            <button
+                                            class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 edit-treatment-btn"
+                                            data-id={t.id}
+                                            >
+                                            ✏️ Editar
+                                            </button>
+
+                                            <button
+                                            class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 delete-treatment-btn"
+                                            data-id={t.id}
+                                            >
+                                            🗑️
+                                            </button>
+
                                         </div>
-                                    )}
+                                        )}
+
                                 </div>
                             ))
                         ) : (
@@ -404,6 +432,7 @@ export const formatCOP = (value: number | string) =>
     data-services={JSON.stringify(servicesList)}
     data-records={JSON.stringify(records)}
     data-master-odontogram={JSON.stringify(masterOdontogram)}
+    data-has-approved-plan={hasApprovedPlan}
     data-treatment-plans={JSON.stringify(treatmentPlans)}     
     data-patient-info={JSON.stringify({name: patient.full_name, doc: patient.document_id, phone: patient.phone, email: patient.email})}
     data-branding={JSON.stringify({name: businessData?.name || "Clínica Dental", color: businessData?.primary_color || "#2563EB", logo: businessData?.logo_url || "", address: businessData?.address || ""})} 
@@ -419,8 +448,21 @@ export const formatCOP = (value: number | string) =>
   // 1. VARIABLES GLOBALES (SINGLE SOURCE OF TRUTH)
   // ==========================================
   const pageData = document.getElementById('page-data');
+
+  const treatmentPlans = JSON.parse(pageData?.dataset.treatmentPlans || '[]');
+
+    const approveBtn = document.getElementById('approve-plan-btn');
+
+    if (approveBtn) {
+    const hasDraft = treatmentPlans.some(t => t.status === 'draft');
+    if (hasDraft) approveBtn.classList.remove('hidden');
+    }
+    
+  
   const patientId = pageData?.dataset.patientId;
   const businessId = pageData?.dataset.businessId;
+
+  
   
   // Parseo seguro de datos
   const dentists = JSON.parse(pageData?.dataset.dentists || '[]');
@@ -442,6 +484,11 @@ export const formatCOP = (value: number | string) =>
 
     // 🔍 Exponer SOLO para debug
     (window as any).clinicalEngineState = clinicalEngineState;
+
+     const hasApprovedPlanFromServer =
+    pageData?.dataset.hasApprovedPlan === 'true';
+    clinicalEngineState.hasApprovedPlan = hasApprovedPlanFromServer;
+    console.log('🧠 Plan aprobado (server):', hasApprovedPlanFromServer);
 
   
 
@@ -689,6 +736,17 @@ export const formatCOP = (value: number | string) =>
         const group = target.closest('.tooth-group');
         if (!group) return;
 
+        // 🔒 BLOQUEO CLÍNICO
+        if (clinicalEngineState.hasApprovedPlan) {
+        Swal.fire(
+            'Plan aprobado',
+            'No se pueden modificar dientes cuando existe un plan aprobado.',
+            'info'
+        );
+        return;
+        }
+
+
         const toothId = group.dataset.tooth;
         const part = target.dataset.part || 'center'; 
         
@@ -752,7 +810,10 @@ export const formatCOP = (value: number | string) =>
 // 🎯 NUEVA FUNCIÓN: Indicador de cambios pendientes
 function detectProblems() {
 
-    
+    if (clinicalEngineState.hasApprovedPlan) {
+    console.warn('🔒 Plan aprobado: motor clínico bloqueado');
+    return;
+  }
     const findingsMap = {};
 
     const rules = {
@@ -964,7 +1025,7 @@ function renderTreatmentPlanSummary() {
               treatment_type: p.treatment,
               priority: p.priority,
               estimated_cost: p.cost,
-              status: 'pending'
+              status: 'draft'
           }));
 
           const { error } = await supabase.from('treatment_plans').insert(treatments);
@@ -978,8 +1039,202 @@ function renderTreatmentPlanSummary() {
       }
   }
 
+document.getElementById('approve-plan-btn')?.addEventListener('click', async () => {
+  const result = await Swal.fire({
+    title: 'Aprobar plan de tratamiento',
+    text: 'Al aprobar el plan se bloqueará el odontograma.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, aprobar',
+    confirmButtonColor: '#059669'
+  });
+
+  if (!result.isConfirmed) return;
+
+  Swal.fire({ title: 'Aprobando...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+
+  // 1️⃣ Aprobar todos los draft
+  const { error: updateError } = await supabase
+    .from('treatment_plans')
+    .update({ status: 'approved' })
+    .eq('patient_id', patientId)
+    .eq('status', 'draft');
+
+  if (updateError) {
+    console.error(updateError);
+    Swal.fire('Error', updateError.message, 'error');
+    return;
+  }
+
+  // 2️⃣ Registrar auditoría
+  const { error: auditError } = await supabase
+    .from('clinical_audit')
+    .insert({
+      business_id: businessId,
+      patient_id: patientId,
+      event_type: 'PLAN_APPROVED',
+      description: 'Plan de tratamiento aprobado',
+      payload: {
+        treatments: clinicalEngineState.problems,
+        approvedAt: new Date().toISOString()
+      }
+    });
+
+  if (auditError) {
+    console.error('❌ Error guardando auditoría:', auditError);
+    Swal.fire('Error crítico', auditError.message, 'error');
+    return;
+  }
+
+  // 3️⃣ Refrescar estado
+  await Swal.fire({ icon: 'success', title: 'Plan aprobado', timer: 1200, showConfirmButton: false });
+  window.location.reload();
+});
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.delete-treatment-btn');
+  if (!btn) return;
+
+  if (clinicalEngineState.hasApprovedPlan) {
+    Swal.fire('Plan aprobado', 'No se pueden modificar tratamientos', 'info');
+    return;
+  }
+
+  const treatmentId = btn.dataset.id;
+
+  const confirm = await Swal.fire({
+    title: 'Eliminar tratamiento',
+    text: 'Este cambio no se puede deshacer.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    confirmButtonColor: '#dc2626'
+  });
+
+  if (!confirm.isConfirmed) return;
+
+  const { error } = await supabase
+    .from('treatment_plans')
+    .delete()
+    .eq('id', treatmentId);
+
+  if (error) {
+    Swal.fire('Error', error.message, 'error');
+    return;
+  }
+
+  await supabase.from('clinical_audit').insert({
+    business_id: businessId,
+    patient_id: patientId,
+    event_type: 'TREATMENT_DELETED',
+    description: 'Tratamiento eliminado',
+    payload: { treatmentId }
+  });
+
+  await Swal.fire({ icon: 'success', title: 'Tratamiento eliminado', timer: 1200, showConfirmButton: false });
+
+  window.location.reload();
+});
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.edit-treatment-btn');
+  if (!btn) return;
+
+  if (clinicalEngineState.hasApprovedPlan) {
+    Swal.fire('Plan aprobado', 'No se pueden modificar tratamientos', 'info');
+    return;
+  }
+
+  const treatmentId = btn.dataset.id;
+
+  const { data: treatment } = await supabase
+    .from('treatment_plans')
+    .select('*')
+    .eq('id', treatmentId)
+    .single();
+
+  if (!treatment) return;
+
+  const { value: formValues } = await Swal.fire({
+    title: '✏️ Editar Tratamiento',
+    html: `
+      <div class="grid gap-3 text-left">
+        <div>
+          <label class="text-xs font-bold text-gray-500">Diente</label>
+          <input id="edit-tooth" value="${treatment.tooth_number}" class="swal2-input m-0 w-full">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-gray-500">Diagnóstico</label>
+          <input id="edit-diagnosis" value="${treatment.diagnosis}" class="swal2-input m-0 w-full">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-gray-500">Tratamiento</label>
+          <input id="edit-type" value="${treatment.treatment_type}" class="swal2-input m-0 w-full">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold text-gray-500">Prioridad</label>
+            <select id="edit-priority" class="swal2-input m-0 w-full">
+              <option ${treatment.priority === 'normal' ? 'selected' : ''}>normal</option>
+              <option ${treatment.priority === 'urgent' ? 'selected' : ''}>urgent</option>
+              <option ${treatment.priority === 'cosmetic' ? 'selected' : ''}>cosmetic</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-500">Costo</label>
+            <input id="edit-cost" type="number" value="${treatment.estimated_cost}" class="swal2-input m-0 w-full">
+          </div>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Guardar cambios',
+    confirmButtonColor: 'rgb(var(--color-brand))'
+  });
+
+  if (!formValues) return;
+
+  const { error } = await supabase
+    .from('treatment_plans')
+    .update({
+      tooth_number: document.getElementById('edit-tooth').value,
+      diagnosis: document.getElementById('edit-diagnosis').value,
+      treatment_type: document.getElementById('edit-type').value,
+      priority: document.getElementById('edit-priority').value,
+      estimated_cost: parseFloat(document.getElementById('edit-cost').value) || 0
+    })
+    .eq('id', treatmentId);
+
+  if (error) {
+    Swal.fire('Error', error.message, 'error');
+    return;
+  }
+
+  await supabase.from('clinical_audit').insert({
+    business_id: businessId,
+    patient_id: patientId,
+    event_type: 'TREATMENT_EDITED',
+    description: 'Tratamiento editado',
+    payload: { treatmentId }
+  });
+
+  await Swal.fire({ icon: 'success', title: 'Tratamiento actualizado', timer: 1200, showConfirmButton: false });
+  window.location.reload();
+});
+
+
+
   // 🎯 Crear tratamiento manual
 document.getElementById('create-treatment-plan-btn')?.addEventListener('click', async () => {
+
+        if (clinicalEngineState.hasApprovedPlan) {
+        Swal.fire(
+        'Plan aprobado',
+        'No se pueden agregar tratamientos cuando el plan ya fue aprobado.',
+        'info'
+        );
+        return;
+    }
     let dentistOptions = '<option value="">Sin asignar</option>';
     dentists.forEach(d => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
     
