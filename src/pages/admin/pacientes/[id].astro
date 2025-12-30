@@ -845,20 +845,23 @@ export const formatCOP = (value: number | string) =>
   
 // 🎯 NUEVA FUNCIÓN: Indicador de cambios pendientes
 function detectProblems() {
-    // 🔥 CORRECCIÓN: Eliminamos el bloqueo aquí. 
-    // Queremos VER los problemas aunque el plan esté aprobado.
-    
-    const findingsMap = {};
+    if (clinicalEngineState.hasApprovedPlan) return;
 
+    const findingsMap = {};
+    // Reglas de negocio (igual que antes)
     const rules = {
         caries: { text: 'Caries detectada', priority: 'urgent', serviceKey: 'Resinas' },
         corona: { text: 'Reemplazo de corona', priority: 'normal', serviceKey: 'Prótesis' },
         ausente: { text: 'Diente ausente', priority: 'normal', serviceKey: 'Implantes' },
-        endodoncia: { text: 'Tratamiento de conducto', priority: 'urgent', serviceKey: 'Endodoncia' }
+        endodoncia: { text: 'Tratamiento de conducto', priority: 'urgent', serviceKey: 'Endodoncia' },
+        implante: { text: 'Implante existente', priority: 'low', serviceKey: 'Control' } // Opcional
     };
 
     Object.entries(mouthState).forEach(([key, value]) => {
         if (!rules[value]) return;
+        // Ignoramos implantes visuales si no queremos cobrarlos de nuevo, o los filtramos después
+        if (value === 'implante') return; 
+
         const [tooth] = key.split('_');
         if (findingsMap[tooth]) return;
 
@@ -872,16 +875,32 @@ function detectProblems() {
         };
     });
 
-    const findings = Object.values(findingsMap);
-    const enrichedFindings = resolveServices(findings, services);
+    // Resolvemos precios
+    const rawFindings = Object.values(findingsMap);
+    let enrichedFindings = resolveServices(rawFindings, services);
 
-    // Fuente de verdad
+    // 🔥 LÓGICA DELTA: Marcar qué hallazgos YA están en el plan (DB)
+    // Comparamos Diente y Tipo de tratamiento (aproximado)
+    enrichedFindings = enrichedFindings.map(f => {
+        const existsInPlan = treatmentPlans.some((t: any) => 
+            // Coincide número de diente
+            t.tooth_number === f.tooth && 
+            // Coincide el estado (borradores o pendientes)
+            ['draft', 'pending'].includes(t.status) &&
+            // Coincide el tipo (Búsqueda laxa para evitar duplicados estrictos)
+            (t.treatment_type.toLowerCase().includes(f.serviceKey.toLowerCase()) || 
+             t.diagnosis === f.description)
+        );
+        
+        return { ...f, isSynced: existsInPlan };
+    });
+
+    // Guardamos estado
     clinicalEngineState.findings = enrichedFindings;
-    clinicalEngineState.problems = mapFindingsToProblems(enrichedFindings);
-
+    
     // UI
     renderFindings(enrichedFindings);
-    renderTreatmentPlanSummary();
+    // renderTreatmentPlanSummary(); // Ya no es tan necesario si la barra amarilla es inteligente
 }
 
 
@@ -931,63 +950,78 @@ function renderFindings(findings) {
   const container = document.getElementById('clinical-alerts');
   if (!container) return;
 
-  container.innerHTML = '';
+  // 1. Separar lo nuevo de lo viejo
+  const newFindings = findings.filter(f => !f.isSynced);
+  const existingPlanTotal = treatmentPlans
+      .filter((t: any) => ['draft', 'pending'].includes(t.status))
+      .reduce((sum: number, t: any) => sum + (Number(t.estimated_cost) || 0), 0);
+  
+  const newFindingsTotal = newFindings.reduce((sum, f) => sum + (f.price || 0), 0);
+  
+  const GRAND_TOTAL = existingPlanTotal + newFindingsTotal;
 
-  if (!findings.length) {
+  // Si no hay nada nuevo Y no hay plan, ocultamos
+  if (newFindings.length === 0 && treatmentPlans.length === 0) {
     container.classList.add('hidden');
     return;
   }
 
   container.classList.remove('hidden');
 
-  const urgentCount = findings.filter(f => f.priority === 'urgent').length;
-  const totalCost = findings.reduce((sum, f) => sum + (f.price || 0), 0);
-
-  // Lógica de visualización del botón
+  // 2. Definir el Botón según el contexto
   let actionButton = '';
-  
+  let statusText = '';
+
   if (clinicalEngineState.hasApprovedPlan) {
-      // Si está aprobado, mostramos un badge informativo
-      actionButton = `<span class="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">🔒 Plan en curso</span>`;
-  } else {
-      // Si NO está aprobado, mostramos el botón de crear
+      statusText = `<p class="text-sm font-bold text-gray-500">🔒 Plan Aprobado</p>`;
+  } 
+  else if (newFindings.length > 0) {
+      // CASO: Hay cosas nuevas para agregar
+      const btnText = treatmentPlans.length > 0 ? '➕ Agregar al Plan' : '✨ Crear Plan';
+      statusText = `<p class="text-sm font-bold text-amber-800">🔍 ${newFindings.length} nuevos hallazgos</p>`;
+      
       actionButton = `
         <button
           id="auto-create-treatment-btn"
-          class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition shadow-sm"
+          class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition shadow-sm animate-pulse"
         >
-          ✨ Crear plan
+          ${btnText}
         </button>`;
+  } 
+  else {
+      // CASO: Todo está sincronizado
+      statusText = `<p class="text-sm font-bold text-green-700">✅ Todo al día</p>`;
+      actionButton = `<span class="text-xs bg-white border border-gray-200 text-gray-500 px-3 py-1.5 rounded-lg">Plan guardado</span>`;
   }
 
   container.innerHTML = `
-    <div class="flex justify-between items-center bg-amber-50 border border-amber-200 rounded-lg p-4 transition-all">
+    <div class="flex justify-between items-center bg-amber-50 border border-amber-200 rounded-lg p-4 transition-all shadow-sm">
       <div>
-        <p class="text-sm font-bold text-amber-800 flex items-center gap-2">
-          🔍 Hallazgos detectados: ${findings.length}
-        </p>
+        ${statusText}
         <p class="text-xs text-amber-600">
-          ${urgentCount} urgentes · Presupuesto estimado
+           Presupuesto Total Estimado
         </p>
       </div>
 
-      <div class="flex items-center gap-4">
-        <span class="text-xl font-bold text-amber-900">
-          ${formatCOP(totalCost)}
-        </span>
+      <div class="flex items-center gap-6">
+        <div class="text-right">
+            <span class="text-2xl font-bold text-amber-900 leading-none">
+              ${formatCOP(GRAND_TOTAL)}
+            </span>
+        </div>
         ${actionButton}
       </div>
     </div>
   `;
 
-  // Solo añadimos el listener si el botón existe
-  if (!clinicalEngineState.hasApprovedPlan) {
+  // Listener solo para los nuevos
+  if (newFindings.length > 0 && !clinicalEngineState.hasApprovedPlan) {
       document.getElementById('auto-create-treatment-btn')?.addEventListener('click', () => {
-          createTreatmentPlanFromFindings(findings);
+          // Solo mandamos a crear los NUEVOS
+          createTreatmentPlanFromFindings(newFindings);
       });
   }
 }
-
 
 function renderTreatmentPlanSummary() {
   const container = document.getElementById('treatment-plan-summary');
@@ -1026,15 +1060,18 @@ function renderTreatmentPlanSummary() {
   
   // 🔥 PEGA LA FUNCIÓN AQUÍ (ESTE ES EL LUGAR CORRECTO):
 // 🔥 CORRECCIÓN: Guardar estado visual junto con el plan
-   async function createAutoPlan(problems) {
-      // Generar opciones de dentistas para el select
+  async function createAutoPlan(problems) {
+      // Generar opciones de dentistas
       let dentistOptions = '';
-      dentists.forEach((d: any) => {
-          dentistOptions += `<option value="${d.id}">${d.name}</option>`;
-      });
+      dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+
+      // Detectar si es una actualización o un plan nuevo para cambiar el texto
+      const isUpdate = treatmentPlans.length > 0;
+      const title = isUpdate ? '➕ Agregar al Plan' : '✨ Crear Plan de Tratamiento';
+      const confirmText = isUpdate ? 'Sí, agregar' : 'Sí, crear plan';
 
       const result = await Swal.fire({
-          title: '✨ Crear Plan de Tratamiento',
+          title: title,
           html: `
               <div class="text-left">
                   <p class="text-sm text-gray-500 mb-2">Responsable del Diagnóstico:</p>
@@ -1042,7 +1079,7 @@ function renderTreatmentPlanSummary() {
                       ${dentistOptions}
                   </select>
 
-                  <p class="mb-2 text-sm text-gray-600 font-bold">Procedimientos detectados:</p>
+                  <p class="mb-2 text-sm text-gray-600 font-bold">Nuevos procedimientos a agregar:</p>
                   <ul class="space-y-2 text-sm max-h-40 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50">
                       ${problems.map(p => `
                           <li class="flex justify-between items-center border-b border-gray-100 pb-1 last:border-0">
@@ -1052,26 +1089,24 @@ function renderTreatmentPlanSummary() {
                       `).join('')}
                   </ul>
                   <div class="mt-4 pt-2 border-t border-gray-200 flex justify-between items-center">
-                      <span class="text-sm text-gray-500">Total Estimado:</span>
+                      <span class="text-sm text-gray-500">Valor a adicionar:</span>
                       <span class="text-lg font-bold text-brand-600">${formatCOP(problems.reduce((sum, p) => sum + p.cost, 0))}</span>
                   </div>
               </div>
           `,
           icon: 'info',
           showCancelButton: true,
-          confirmButtonText: 'Crear Plan',
+          confirmButtonText: confirmText,
           confirmButtonColor: 'rgb(var(--color-brand))',
-          preConfirm: () => {
-              return document.getElementById('plan-author').value;
-          }
+          preConfirm: () => document.getElementById('plan-author').value
       });
 
       if (result.isConfirmed) {
-        const selectedDentistId = result.value; // El ID del doctor seleccionado
-        Swal.fire({ title: 'Procesando...', text: 'Guardando plan y odontograma...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+          const selectedDentistId = result.value;
+          Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
           
           try {
-              // 1. Guardar Tratamientos
+              // 1. Insertar SOLO los nuevos tratamientos
               const treatments = problems.map(p => ({
                   patient_id: patientId,
                   business_id: businessId,
@@ -1081,31 +1116,30 @@ function renderTreatmentPlanSummary() {
                   priority: p.priority,
                   estimated_cost: p.cost,
                   status: 'draft',
-                  dentist_id: selectedDentistId // <--- TRAZABILIDAD
+                  dentist_id: selectedDentistId
               }));
 
               const { error: planError } = await supabase.from('treatment_plans').insert(treatments);
               if (planError) throw planError;
 
-              // 2. 🔥 GUARDAR ODONTOGRAMA (CRÍTICO)
-              // Esto asegura que al recargar, los dientes sigan pintados
+              // 2. Actualizar el Odontograma Visual (Siempre guardamos el estado completo actual)
               const { error: odontoError } = await supabase.from('clinical_records').insert({
                   business_id: businessId,
                   patient_id: patientId,
                   record_type: 'odontogram',
-                  description: 'Actualización automática por creación de plan',
-                  data: mouthState, // <--- Aquí guardamos lo que pintaste
-                  dentist_id: selectedDentistId // <--- TRAZABILIDAD
+                  description: isUpdate ? 'Adición de hallazgos al plan' : 'Creación de plan inicial',
+                  data: mouthState, 
+                  dentist_id: selectedDentistId
               });
 
               if (odontoError) throw odontoError;
 
-              await Swal.fire({ icon: 'success', title: '¡Plan Creado!', timer: 1500, showConfirmButton: false });
+              await Swal.fire({ icon: 'success', title: 'Plan Actualizado', timer: 1500, showConfirmButton: false });
               window.location.reload();
 
           } catch (e) {
               console.error(e);
-              Swal.fire('Error', 'No se pudieron guardar los cambios. Intenta de nuevo.', 'error');
+              Swal.fire('Error', 'No se pudieron guardar los cambios.', 'error');
           }
       }
   }
@@ -1371,64 +1405,65 @@ document.addEventListener('click', async (e) => {
 
             if (noteError) throw noteError;
 
-            // C. 🔥 ACTUALIZAR ODONTOGRAMA "VIVO" (Lógica Smart)
+            // C. 🔥 ACTUALIZAR ODONTOGRAMA "VIVO" (Lógica Smart Mejorada)
             if (formValues.autoUpdate) {
                 let hasChanges = false;
                 const treatLower = treatment.toLowerCase();
 
-                // Lógica de transformación de estado
-                // 1. Si es Extracción/Exodoncia -> Poner Ausente
-                if (treatLower.includes('extracc') || treatLower.includes('exodoncia')) {
-                    // Borrar partes individuales
+                // 1. Caso IMPLANTE (Corrige la "X" de Ausente)
+                if (treatLower.includes('implante')) {
+                    // Si estaba marcado como ausente, lo quitamos
+                    if (mouthState[`${tooth}_center`] === 'ausente') {
+                        delete mouthState[`${tooth}_center`]; 
+                    }
+                    // Y aplicamos el estado de implante (Tornillo visual)
+                    mouthState[`${tooth}_center`] = 'implante';
+                    hasChanges = true;
+                }
+                // 2. Caso EXTRACCIÓN (Poner Ausente)
+                else if (treatLower.includes('extracc') || treatLower.includes('exodoncia')) {
                     ['top','bottom','left','right','center'].forEach(p => delete mouthState[`${tooth}_${p}`]);
-                    // Poner estado global
                     mouthState[`${tooth}_center`] = 'ausente';
                     hasChanges = true;
                 }
-                // 2. Si es Corona -> Poner Corona
+                // 3. Caso CORONA
                 else if (treatLower.includes('corona')) {
                     mouthState[`${tooth}_center`] = 'corona';
                     hasChanges = true;
                 }
-                // 3. Si es Endodoncia -> Poner Endodoncia
+                // 4. Caso ENDODONCIA
                 else if (treatLower.includes('endodoncia') || treatLower.includes('conducto')) {
                     mouthState[`${tooth}_center`] = 'endodoncia';
                     hasChanges = true;
                 }
-                // 4. Si es Resina/Obturación (Lo más común) -> Buscar caries y volverlas resina
+                // 5. Caso RESINA / OBTURACIÓN
                 else if (treatLower.includes('resina') || treatLower.includes('calza') || treatLower.includes('obturaci')) {
-                    // Buscamos en todas las caras de ESE diente
                     ['top','bottom','left','right','center'].forEach(part => {
                         const key = `${tooth}_${part}`;
-                        // Si estaba cariado o sano, lo volvemos resina
-                        // (A veces no estaba marcado como caries, pero igual se hizo la resina)
                         if (mouthState[key] === 'caries') {
                             mouthState[key] = 'resina';
                             hasChanges = true;
                         }
                     });
-                    
-                    // Si no encontró ninguna caries específica pero es una resina,
-                    // marcamos el centro por defecto para que se vea algo
+                    // Fallback si no había caries marcada
                     if (!hasChanges) {
                         mouthState[`${tooth}_center`] = 'resina';
                         hasChanges = true;
                     }
                 }
 
-                // Si hubo cambios visuales, guardamos el nuevo snapshot del odontograma
+                // Guardar Snapshot si hubo cambios visuales
                 if (hasChanges) {
                     await supabase.from('clinical_records').insert({
                         business_id: businessId,
                         patient_id: patientId,
                         dentist_id: formValues.dentist,
                         record_type: 'odontogram',
-                        description: `Actualización automática post-tratamiento (${treatment})`,
+                        description: `Actualización visual automática (${treatment})`,
                         data: mouthState
                     });
                 }
             }
-
             await Swal.fire('Éxito', 'Tratamiento completado y registrado', 'success');
             window.location.reload();
 
@@ -1441,44 +1476,46 @@ document.addEventListener('click', async (e) => {
 
 
 
-  // 🎯 Crear tratamiento manual
+ // 🎯 CREAR TRATAMIENTO MANUAL (Para procedimientos visuales y NO visuales)
 document.getElementById('create-treatment-plan-btn')?.addEventListener('click', async () => {
 
-        if (clinicalEngineState.hasApprovedPlan) {
-        Swal.fire(
-        'Plan aprobado',
-        'No se pueden agregar tratamientos cuando el plan ya fue aprobado.',
-        'info'
-        );
+    if (clinicalEngineState.hasApprovedPlan) {
+        Swal.fire('Plan aprobado', 'No se pueden agregar tratamientos a un plan cerrado.', 'info');
         return;
     }
+
     let dentistOptions = '<option value="">Sin asignar</option>';
     dentists.forEach(d => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
     
-    let serviceOptions = '<option value="">-- Ninguno --</option>';
-    services.forEach(s => serviceOptions += `<option value="${s.id}">${s.name} - $${s.price || 0}</option>`);
+    let serviceOptions = '<option value="">-- Ninguno / General --</option>';
+    services.forEach(s => serviceOptions += `<option value="${s.id}" data-price="${s.price}">${s.name} - ${formatCOP(s.price)}</option>`);
 
     const { value: formValues } = await Swal.fire({
-        title: '📋 Nuevo Tratamiento',
+        title: '📋 Agregar Procedimiento Manual',
         html: `
             <div class="grid gap-3 text-left">
-                <div>
-                    <label class="text-xs font-bold text-gray-500">Diente (FDI) *</label>
-                    <input id="treat-tooth" type="text" placeholder="Ej: 18, 21, 46..." class="swal2-input m-0 w-full">
+                <div class="bg-blue-50 p-2 rounded text-xs text-blue-700 mb-2">
+                    💡 Úsalo para limpiezas, radiografías, ortodoncia o hallazgos específicos.
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Diente (Opcional)</label>
+                        <input id="treat-tooth" type="number" placeholder="Ej: 18" class="swal2-input m-0 w-full">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500">Servicio</label>
+                        <select id="treat-service" class="swal2-input m-0 w-full text-sm">${serviceOptions}</select>
+                    </div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-gray-500">Diagnóstico *</label>
-                    <input id="treat-diagnosis" placeholder="Ej: Caries profunda" class="swal2-input m-0 w-full">
+                    <label class="text-xs font-bold text-gray-500">Tratamiento / Descripción *</label>
+                    <input id="treat-type" placeholder="Ej: Profilaxis General" class="swal2-input m-0 w-full">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-gray-500">Tratamiento *</label>
-                    <input id="treat-type" placeholder="Ej: Resina Composite" class="swal2-input m-0 w-full">
+                    <label class="text-xs font-bold text-gray-500">Diagnóstico</label>
+                    <input id="treat-diagnosis" placeholder="Ej: Placa bacteriana" class="swal2-input m-0 w-full">
                 </div>
-                <div>
-                    <label class="text-xs font-bold text-gray-500">Servicio (Opcional)</label>
-                    <select id="treat-service" class="swal2-input m-0 w-full">${serviceOptions}</select>
-                    <small class="text-gray-500 text-xs">Si seleccionas un servicio, el costo se llena automáticamente</small>
-                </div>
+                
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs font-bold text-gray-500">Prioridad</label>
@@ -1489,8 +1526,8 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
                         </select>
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-gray-500">Costo Estimado</label>
-                        <input id="treat-cost" type="number" placeholder="$80" class="swal2-input m-0 w-full">
+                        <label class="text-xs font-bold text-gray-500">Costo</label>
+                        <input id="treat-cost" type="number" placeholder="0" class="swal2-input m-0 w-full">
                     </div>
                 </div>
                 <div>
@@ -1500,37 +1537,40 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: 'Crear',
+        confirmButtonText: 'Agregar al Plan',
         confirmButtonColor: 'rgb(var(--color-brand))',
         didOpen: () => {
-            // 🎯 Auto-llenar costo al seleccionar servicio
-            const serviceSelect = document.getElementById('treat-service') ;
+            const serviceSelect = document.getElementById('treat-service') as HTMLSelectElement;
             const costInput = document.getElementById('treat-cost') as HTMLInputElement;
+            const typeInput = document.getElementById('treat-type') as HTMLInputElement;
             
+            // Auto-llenar datos al elegir servicio
             serviceSelect?.addEventListener('change', () => {
-                const selectedService = services.find(s => s.id === serviceSelect.value);
-                if (selectedService && costInput) {
-                    costInput.value = selectedService.price?.toString() || '0';
-                }
+                const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+                const price = selectedOption.getAttribute('data-price');
+                const text = selectedOption.text.split(' - ')[0]; // Nombre sin precio
+                
+                if (price) costInput.value = price;
+                if (serviceSelect.value) typeInput.value = text;
             });
         },
         preConfirm: () => {
-            const diagnosis = (document.getElementById('treat-diagnosis') as HTMLInputElement).value;
             const treatmentType = (document.getElementById('treat-type') as HTMLInputElement).value;
+            const cost = (document.getElementById('treat-cost') as HTMLInputElement).value;
             
-            if (!diagnosis || !treatmentType) {
-                Swal.showValidationMessage('Completa los campos obligatorios (*)');
+            if (!treatmentType || !cost) {
+                Swal.showValidationMessage('El tratamiento y el costo son obligatorios');
                 return false;
             }
             
             return {
-                tooth_number: (document.getElementById('treat-tooth') as HTMLInputElement).value,
-                diagnosis,
+                tooth_number: (document.getElementById('treat-tooth') as HTMLInputElement).value || null, // Puede ser null
+                diagnosis: (document.getElementById('treat-diagnosis') as HTMLInputElement).value,
                 treatment_type: treatmentType,
-                priority: (document.getElementById('treat-priority') ).value,
-                estimated_cost: parseFloat((document.getElementById('treat-cost') as HTMLInputElement).value) || 0,
-                dentist_id: (document.getElementById('treat-dentist') ).value || null,
-                service_id: (document.getElementById('treat-service') ).value || null
+                priority: (document.getElementById('treat-priority') as HTMLSelectElement).value,
+                estimated_cost: parseFloat(cost) || 0,
+                dentist_id: (document.getElementById('treat-dentist') as HTMLSelectElement).value || null,
+                service_id: (document.getElementById('treat-service') as HTMLSelectElement).value || null
             };
         }
     });
@@ -1538,18 +1578,59 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
     if (formValues) {
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
         
-        const { error } = await supabase.from('treatment_plans').insert({
-            patient_id: patientId,
-            business_id: businessId,
-            ...formValues,
-            status: 'pending'
-        });
+        try {
+            // 1. Guardar Tratamiento (Usamos 'draft' para que se sume al plan actual)
+            const { error: planError } = await supabase.from('treatment_plans').insert({
+                patient_id: patientId,
+                business_id: businessId,
+                ...formValues,
+                status: 'draft' // <--- CLAVE: Se une al borrador existente
+            });
 
-        if (error) {
-            Swal.fire('Error', error.message, 'error');
-        } else {
-            await Swal.fire({ icon: 'success', title: '¡Creado!', timer: 1500, showConfirmButton: false });
-            window.location.reload();
+            if (planError) throw planError;
+
+            // 2. 🔥 INTENTO DE SINCRONIZACIÓN VISUAL (Si aplica)
+            // Si el usuario puso un diente y el texto coincide con algo visual, lo pintamos.
+            if (formValues.tooth_number) {
+                let visualChanged = false;
+                const tooth = formValues.tooth_number;
+                const typeLower = formValues.treatment_type.toLowerCase();
+
+                // Lógica simple de mapeo manual -> visual
+                if (typeLower.includes('ausente') || typeLower.includes('extrac')) {
+                    mouthState[`${tooth}_center`] = 'ausente';
+                    visualChanged = true;
+                } else if (typeLower.includes('corona')) {
+                    mouthState[`${tooth}_center`] = 'corona';
+                    visualChanged = true;
+                } else if (typeLower.includes('endodoncia')) {
+                    mouthState[`${tooth}_center`] = 'endodoncia';
+                    visualChanged = true;
+                } else if (typeLower.includes('implante')) {
+                    if (mouthState[`${tooth}_center`] === 'ausente') delete mouthState[`${tooth}_center`];
+                    mouthState[`${tooth}_center`] = 'implante';
+                    visualChanged = true;
+                }
+
+                // Si hubo cambio visual, guardamos el snapshot
+                if (visualChanged) {
+                    await supabase.from('clinical_records').insert({
+                        business_id: businessId,
+                        patient_id: patientId,
+                        record_type: 'odontogram',
+                        description: 'Actualización por ingreso manual',
+                        data: mouthState, 
+                        dentist_id: formValues.dentist_id
+                    });
+                }
+            }
+
+            await Swal.fire({ icon: 'success', title: 'Agregado al Plan', timer: 1500, showConfirmButton: false });
+            window.location.reload(); // Recarga para recalcular totales y mostrar en la lista
+
+        } catch (e: any) {
+            console.error(e);
+            Swal.fire('Error', e.message, 'error');
         }
     }
 });
