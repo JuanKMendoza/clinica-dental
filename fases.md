@@ -85,3 +85,55 @@ CRUD Completo de notas (Crear con tipo/doctor, Editar, Borrar).
 Gestión de Alergias crítica.
 Quick Actions: Agendamiento rápido y gestión de citas (Editar/Borrar) sin salir del perfil.
 UX Móvil: Pestañas (Tabs) con scroll horizontal y layouts adaptables.
+
+
+////
+29 Diciembre 2025
+
+🧱 Estado actual de tu sistema (muy bueno)
+
+En este momento tu arquitectura ya tiene:
+
+✔️ Auth de Supabase
+✔️ RLS activado
+✔️ Multitenancy por business_id
+✔️ Auditoría clínica
+✔️ Protección por sesión
+✔️ Motor clínico bloqueado por estado aprobado
+
+Esto es seguridad de producto, que es más importante que el captcha al inicio.
+
+El captcha es perímetro, se pone justo antes de salir a público.
+
+🗓️ Roadmap correcto para tu caso
+Ahora
+
+Enfócate en:
+
+Flujo clínico completo
+
+Estabilidad
+
+UX
+
+Auditoría y versionado
+
+Marketing y demo
+
+Cuando compres el dominio
+
+En ese mismo día:
+
+Configuras dominio en Netlify
+
+Configuras dominio en Supabase
+
+Configuras Turnstile con ese dominio
+
+Pegas claves en Supabase
+
+Pruebas login
+
+Listo
+
+Eso es una tarea de 20–30 minutos cuando tengas dominio.
