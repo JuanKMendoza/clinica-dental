@@ -329,35 +329,58 @@ export const formatCOP = (value: number | string) =>
                                     </div>
                                     
                                     <!-- Botones de Acción Rápida -->
-                                        {['draft','pending'].includes(t.status) && !hasApprovedPlan && (
+                                    
+                                    <!-- 1. ESTADO BORRADOR (Tu código original conservado) -->
+                                    {['draft','pending'].includes(t.status) && !hasApprovedPlan && (
                                         <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200/50">
-                                            
                                             <button
-                                            class="flex-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors schedule-treatment-btn"
-                                            data-id={t.id}
-                                            data-service-id={t.services?.id || ''}
-                                            data-service-name={t.services?.name || ''}
-                                            data-dentist-id={t.dentist_id || ''}
+                                                class="flex-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors schedule-treatment-btn"
+                                                data-id={t.id}
+                                                data-service-id={t.services?.id || ''}
+                                                data-service-name={t.services?.name || ''}
+                                                data-dentist-id={t.dentist_id || ''}
                                             >
-                                            📅 Agendar
+                                                📅 Agendar
                                             </button>
 
                                             <button
-                                            class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 edit-treatment-btn"
-                                            data-id={t.id}
+                                                class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 edit-treatment-btn"
+                                                data-id={t.id}
                                             >
-                                            ✏️ Editar
+                                                ✏️ Editar
                                             </button>
 
                                             <button
-                                            class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 delete-treatment-btn"
-                                            data-id={t.id}
+                                                class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 delete-treatment-btn"
+                                                data-id={t.id}
                                             >
-                                            🗑️
+                                                🗑️
                                             </button>
-
                                         </div>
-                                        )}
+                                    )}
+
+                                    <!-- 2. ESTADO APROBADO (Nueva funcionalidad: Ejecutar) -->
+                                    {t.status === 'approved' && (
+                                        <div class="mt-3 pt-3 border-t border-gray-200/50">
+                                            <button 
+                                                class="w-full px-3 py-2 bg-brand-600 text-white rounded-lg text-xs font-bold hover:bg-brand-700 shadow-sm flex items-center justify-center gap-2 execute-treatment-btn"
+                                                data-id={t.id}
+                                                data-tooth={t.tooth_number}
+                                                data-treatment={t.treatment_type}
+                                            >
+                                                ⚡ Realizar Procedimiento
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <!-- 3. ESTADO COMPLETADO (Visualización) -->
+                                    {t.status === 'completed' && (
+                                        <div class="mt-3 pt-3 border-t border-gray-200/50">
+                                            <div class="w-full px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-2 cursor-default">
+                                                ✅ Realizado el {new Date(t.completed_at || t.created_at).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    )}
 
                                 </div>
                             ))
@@ -1003,36 +1026,49 @@ function renderTreatmentPlanSummary() {
   
   // 🔥 PEGA LA FUNCIÓN AQUÍ (ESTE ES EL LUGAR CORRECTO):
 // 🔥 CORRECCIÓN: Guardar estado visual junto con el plan
-  async function createAutoPlan(problems) {
+   async function createAutoPlan(problems) {
+      // Generar opciones de dentistas para el select
+      let dentistOptions = '';
+      dentists.forEach((d: any) => {
+          dentistOptions += `<option value="${d.id}">${d.name}</option>`;
+      });
+
       const result = await Swal.fire({
-          title: '✨ Crear Plan Automático',
+          title: '✨ Crear Plan de Tratamiento',
           html: `
               <div class="text-left">
-                  <p class="mb-3 text-sm text-gray-600">Se crearán ${problems.length} tratamientos y se guardará el estado actual:</p>
-                  <ul class="space-y-2 text-sm max-h-40 overflow-y-auto">
+                  <p class="text-sm text-gray-500 mb-2">Responsable del Diagnóstico:</p>
+                  <select id="plan-author" class="swal2-input m-0 mb-4 w-full text-sm">
+                      ${dentistOptions}
+                  </select>
+
+                  <p class="mb-2 text-sm text-gray-600 font-bold">Procedimientos detectados:</p>
+                  <ul class="space-y-2 text-sm max-h-40 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50">
                       ${problems.map(p => `
-                          <li class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <li class="flex justify-between items-center border-b border-gray-100 pb-1 last:border-0">
                               <span>🦷 ${p.tooth} - ${p.treatment}</span>
                               <span class="font-bold">${formatCOP(p.cost)}</span>
                           </li>
                       `).join('')}
                   </ul>
-                  <div class="mt-4 pt-3 border-t border-gray-200">
-                      <div class="flex justify-between font-bold text-lg">
-                          <span>Total:</span>
-                          <span class="text-brand-600">${formatCOP(problems.reduce((sum, p) => sum + p.cost, 0))}</span>
-                      </div>
+                  <div class="mt-4 pt-2 border-t border-gray-200 flex justify-between items-center">
+                      <span class="text-sm text-gray-500">Total Estimado:</span>
+                      <span class="text-lg font-bold text-brand-600">${formatCOP(problems.reduce((sum, p) => sum + p.cost, 0))}</span>
                   </div>
               </div>
           `,
-          icon: 'question',
+          icon: 'info',
           showCancelButton: true,
-          confirmButtonText: 'Sí, crear y guardar',
-          confirmButtonColor: 'rgb(var(--color-brand))'
+          confirmButtonText: 'Crear Plan',
+          confirmButtonColor: 'rgb(var(--color-brand))',
+          preConfirm: () => {
+              return document.getElementById('plan-author').value;
+          }
       });
 
       if (result.isConfirmed) {
-          Swal.fire({ title: 'Procesando...', text: 'Guardando plan y odontograma...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+        const selectedDentistId = result.value; // El ID del doctor seleccionado
+        Swal.fire({ title: 'Procesando...', text: 'Guardando plan y odontograma...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
           
           try {
               // 1. Guardar Tratamientos
@@ -1044,7 +1080,8 @@ function renderTreatmentPlanSummary() {
                   treatment_type: p.treatment,
                   priority: p.priority,
                   estimated_cost: p.cost,
-                  status: 'draft'
+                  status: 'draft',
+                  dentist_id: selectedDentistId // <--- TRAZABILIDAD
               }));
 
               const { error: planError } = await supabase.from('treatment_plans').insert(treatments);
@@ -1058,7 +1095,7 @@ function renderTreatmentPlanSummary() {
                   record_type: 'odontogram',
                   description: 'Actualización automática por creación de plan',
                   data: mouthState, // <--- Aquí guardamos lo que pintaste
-                  dentist_id: null // O el usuario actual si lo tienes
+                  dentist_id: selectedDentistId // <--- TRAZABILIDAD
               });
 
               if (odontoError) throw odontoError;
@@ -1251,6 +1288,155 @@ document.addEventListener('click', async (e) => {
 
   await Swal.fire({ icon: 'success', title: 'Tratamiento actualizado', timer: 1200, showConfirmButton: false });
   window.location.reload();
+});
+
+// ⚡ HANDLER: EJECUTAR TRATAMIENTO (Evolución + Actualización Visual)
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.execute-treatment-btn');
+    if (!btn) return;
+
+    const { id, tooth, treatment } = btn.dataset;
+
+    // 1. Preparamos lista de doctores para el select
+    let dentistOptions = '';
+    dentists.forEach(d => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+
+    const { value: formValues } = await Swal.fire({
+        title: '⚡ Finalizar Procedimiento',
+        html: `
+            <div class="text-left space-y-3">
+                <div class="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                    🦷 Diente <b>${tooth}</b>: ${treatment}
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Profesional que realizó *</label>
+                    <select id="evo-dentist" class="swal2-input m-0 w-full text-sm">
+                        ${dentistOptions}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Nota de Evolución *</label>
+                    <textarea id="evo-note" class="swal2-textarea m-0 w-full h-24 text-sm" 
+                    placeholder="Ej: Se realiza procedimiento sin complicaciones. Anestesia..."></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" id="auto-update-map" checked class="w-4 h-4 text-brand-600 rounded">
+                    <label for="auto-update-map" class="text-sm text-gray-700 font-medium">
+                        Actualizar mapa dental (Caries ➝ Resina)
+                    </label>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar y Completar',
+        confirmButtonColor: 'rgb(var(--color-brand))',
+        preConfirm: () => {
+            const note = document.getElementById('evo-note').value;
+            const dentist = document.getElementById('evo-dentist').value;
+            const autoUpdate = (document.getElementById('auto-update-map') as HTMLInputElement).checked;
+            
+            if (!note || !dentist) {
+                Swal.showValidationMessage('Todos los campos son obligatorios');
+                return false;
+            }
+            return { note, dentist, autoUpdate };
+        }
+    });
+
+    if (formValues) {
+        Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
+
+        try {
+            // A. MARCAR PLAN COMO COMPLETADO
+            const { error: planError } = await supabase.from('treatment_plans')
+                .update({ 
+                    status: 'completed', 
+                    completed_at: new Date().toISOString() 
+                })
+                .eq('id', id);
+            
+            if (planError) throw planError;
+
+            // B. CREAR NOTA DE EVOLUCIÓN
+            const { error: noteError } = await supabase.from('clinical_records').insert({
+                business_id: businessId,
+                patient_id: patientId,
+                dentist_id: formValues.dentist, // El doctor seleccionado
+                record_type: 'Evolución',
+                description: `REALIZADO (Diente ${tooth}): ${treatment}.\n\n📝 NOTA CLÍNICA:\n${formValues.note}`
+            });
+
+            if (noteError) throw noteError;
+
+            // C. 🔥 ACTUALIZAR ODONTOGRAMA "VIVO" (Lógica Smart)
+            if (formValues.autoUpdate) {
+                let hasChanges = false;
+                const treatLower = treatment.toLowerCase();
+
+                // Lógica de transformación de estado
+                // 1. Si es Extracción/Exodoncia -> Poner Ausente
+                if (treatLower.includes('extracc') || treatLower.includes('exodoncia')) {
+                    // Borrar partes individuales
+                    ['top','bottom','left','right','center'].forEach(p => delete mouthState[`${tooth}_${p}`]);
+                    // Poner estado global
+                    mouthState[`${tooth}_center`] = 'ausente';
+                    hasChanges = true;
+                }
+                // 2. Si es Corona -> Poner Corona
+                else if (treatLower.includes('corona')) {
+                    mouthState[`${tooth}_center`] = 'corona';
+                    hasChanges = true;
+                }
+                // 3. Si es Endodoncia -> Poner Endodoncia
+                else if (treatLower.includes('endodoncia') || treatLower.includes('conducto')) {
+                    mouthState[`${tooth}_center`] = 'endodoncia';
+                    hasChanges = true;
+                }
+                // 4. Si es Resina/Obturación (Lo más común) -> Buscar caries y volverlas resina
+                else if (treatLower.includes('resina') || treatLower.includes('calza') || treatLower.includes('obturaci')) {
+                    // Buscamos en todas las caras de ESE diente
+                    ['top','bottom','left','right','center'].forEach(part => {
+                        const key = `${tooth}_${part}`;
+                        // Si estaba cariado o sano, lo volvemos resina
+                        // (A veces no estaba marcado como caries, pero igual se hizo la resina)
+                        if (mouthState[key] === 'caries') {
+                            mouthState[key] = 'resina';
+                            hasChanges = true;
+                        }
+                    });
+                    
+                    // Si no encontró ninguna caries específica pero es una resina,
+                    // marcamos el centro por defecto para que se vea algo
+                    if (!hasChanges) {
+                        mouthState[`${tooth}_center`] = 'resina';
+                        hasChanges = true;
+                    }
+                }
+
+                // Si hubo cambios visuales, guardamos el nuevo snapshot del odontograma
+                if (hasChanges) {
+                    await supabase.from('clinical_records').insert({
+                        business_id: businessId,
+                        patient_id: patientId,
+                        dentist_id: formValues.dentist,
+                        record_type: 'odontogram',
+                        description: `Actualización automática post-tratamiento (${treatment})`,
+                        data: mouthState
+                    });
+                }
+            }
+
+            await Swal.fire('Éxito', 'Tratamiento completado y registrado', 'success');
+            window.location.reload();
+
+        } catch (error: any) {
+            console.error(error);
+            Swal.fire('Error', error.message || 'No se pudo guardar', 'error');
+        }
+    }
 });
 
 
@@ -2053,6 +2239,7 @@ if (document.readyState === 'loading') {
 } else {
     mountApplication();
 }
+
 
 
 </script>
