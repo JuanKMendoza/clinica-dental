@@ -553,6 +553,9 @@ export const formatCOP = (value: number | string) =>
   const tabContents = document.querySelectorAll('.tab-content');
 
   function switchTab(targetId: string) {
+      // 0. Guardar la pestaña actual en memoria para que sobreviva al reload
+      localStorage.setItem('activeTab', targetId);
+
       // 1. Ocultar todos los contenidos
       tabContents.forEach(c => c.classList.add('hidden'));
       
@@ -2396,6 +2399,9 @@ async function mountApplication() { // <--- Ahora es ASYNC
     
     // Opcional: Si quieres que arranque siempre en el tab de historial o odontograma
     // switchTab('tab-odontogram'); 
+    // 🔥 CORRECCIÓN: Recuperar la última pestaña visitada o usar default
+    const lastTab = localStorage.getItem('activeTab') || 'tab-history';
+    switchTab(lastTab);
 }
 
 // Esperar DOM listo
