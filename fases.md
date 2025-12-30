@@ -137,3 +137,30 @@ Pruebas login
 Listo
 
 Eso es una tarea de 20–30 minutos cuando tengas dominio.
+
+
+Se sigue con la fase 3.2:
+
+🧬 Y ahora sí… lo grande
+
+Con esto listo, pasamos al último bloque fuerte de esta fase:
+
+Versionado del odontograma por plan aprobado
+
+Esto nos permite:
+
+Mantener historia legal del estado bucal
+
+Asociar cada plan aprobado con el odontograma exacto
+
+Poder ver:
+
+“Este plan se aprobó con este estado bucal”
+
+🧭 Próximo paso del roadmap
+
+Paso siguiente:
+
+🧬 1️⃣ Congelar odontograma al aprobar plan
+🧬 2️⃣ Guardar versión en nueva tabla
+🧬 3️⃣ Visualizar versiones por fecha

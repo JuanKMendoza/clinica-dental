@@ -229,6 +229,11 @@ export const formatCOP = (value: number | string) =>
                             >
                             📜 Ver Historial
                             </button>
+                            <!-- 🧬 NUEVO: Versionado legal del plan -->
+                            <button id="view-legal-versions-btn"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold shadow">
+                            🧬 Versiones del Plan
+                            </button>
                         </div>
                     </div>
 
@@ -544,9 +549,9 @@ export const formatCOP = (value: number | string) =>
           activeBtn.classList.add('bg-brand-50', 'text-brand-700', 'border-l-4', 'border-brand-600');
       }
       
-      // Si cambiamos al tab de Odontograma, asegurarnos que el canvas se vea bien
+      // 🔥 CORRECCIÓN: Si es odontograma, solo repintar colores, NO reiniciar estructura
       if(targetId === 'tab-odontogram') {
-          updateVisuals();
+          requestAnimationFrame(() => updateVisuals());
       }
   }
 
@@ -780,7 +785,14 @@ export const formatCOP = (value: number | string) =>
   }
 
   // Helper para manejar el cambio (Agregar esta función nueva debajo de attachToothListeners)
+  // Helper para manejar el cambio
   function handleStatusChange(tooth, part, status) {
+      // 🔒 VALIDACIÓN DE SEGURIDAD (Defensa en profundidad)
+      if (clinicalEngineState.hasApprovedPlan) {
+          console.warn('🚫 Modificación bloqueada: Existe un plan aprobado.');
+          return;
+      }
+
       const key = `${tooth}_${part}`;
       
       if (status === 'sano') {
@@ -797,6 +809,7 @@ export const formatCOP = (value: number | string) =>
               mouthState[key] = status;
           }
       }
+      
       updateVisuals(); 
       detectProblems();
       
@@ -809,11 +822,9 @@ export const formatCOP = (value: number | string) =>
   
 // 🎯 NUEVA FUNCIÓN: Indicador de cambios pendientes
 function detectProblems() {
-
-    if (clinicalEngineState.hasApprovedPlan) {
-    console.warn('🔒 Plan aprobado: motor clínico bloqueado');
-    return;
-  }
+    // 🔥 CORRECCIÓN: Eliminamos el bloqueo aquí. 
+    // Queremos VER los problemas aunque el plan esté aprobado.
+    
     const findingsMap = {};
 
     const rules = {
@@ -825,14 +836,10 @@ function detectProblems() {
 
     Object.entries(mouthState).forEach(([key, value]) => {
         if (!rules[value]) return;
-
         const [tooth] = key.split('_');
-
-        // ⛔ evita duplicados por superficie
         if (findingsMap[tooth]) return;
 
         const rule = rules[value];
-
         findingsMap[tooth] = {
             tooth,
             type: value,
@@ -845,14 +852,12 @@ function detectProblems() {
     const findings = Object.values(findingsMap);
     const enrichedFindings = resolveServices(findings, services);
 
-    // 🧠 FUENTE DE VERDAD
+    // Fuente de verdad
     clinicalEngineState.findings = enrichedFindings;
     clinicalEngineState.problems = mapFindingsToProblems(enrichedFindings);
 
-    // 🖥 UI EXISTENTE (no se toca)
+    // UI
     renderFindings(enrichedFindings);
-
-    // 🔥 NUEVO: resumen inferior SIEMPRE sincronizado
     renderTreatmentPlanSummary();
 }
 
@@ -915,10 +920,27 @@ function renderFindings(findings) {
   const urgentCount = findings.filter(f => f.priority === 'urgent').length;
   const totalCost = findings.reduce((sum, f) => sum + (f.price || 0), 0);
 
+  // Lógica de visualización del botón
+  let actionButton = '';
+  
+  if (clinicalEngineState.hasApprovedPlan) {
+      // Si está aprobado, mostramos un badge informativo
+      actionButton = `<span class="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">🔒 Plan en curso</span>`;
+  } else {
+      // Si NO está aprobado, mostramos el botón de crear
+      actionButton = `
+        <button
+          id="auto-create-treatment-btn"
+          class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition shadow-sm"
+        >
+          ✨ Crear plan
+        </button>`;
+  }
+
   container.innerHTML = `
-    <div class="flex justify-between items-center bg-amber-50 border border-amber-200 rounded-lg p-4">
+    <div class="flex justify-between items-center bg-amber-50 border border-amber-200 rounded-lg p-4 transition-all">
       <div>
-        <p class="text-sm font-bold text-amber-800">
+        <p class="text-sm font-bold text-amber-800 flex items-center gap-2">
           🔍 Hallazgos detectados: ${findings.length}
         </p>
         <p class="text-xs text-amber-600">
@@ -928,25 +950,19 @@ function renderFindings(findings) {
 
       <div class="flex items-center gap-4">
         <span class="text-xl font-bold text-amber-900">
-          $${totalCost.toLocaleString('es-CO')}
+          ${formatCOP(totalCost)}
         </span>
-
-        <button
-          id="auto-create-treatment-btn"
-          class="px-4 py-2 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition"
-        >
-          Crear plan
-        </button>
+        ${actionButton}
       </div>
     </div>
   `;
 
-  // 🔥 CONEXIÓN REAL
-  document
-    .getElementById('auto-create-treatment-btn')
-    ?.addEventListener('click', () => {
-      createTreatmentPlanFromFindings(findings);
-    });
+  // Solo añadimos el listener si el botón existe
+  if (!clinicalEngineState.hasApprovedPlan) {
+      document.getElementById('auto-create-treatment-btn')?.addEventListener('click', () => {
+          createTreatmentPlanFromFindings(findings);
+      });
+  }
 }
 
 
@@ -986,13 +1002,14 @@ function renderTreatmentPlanSummary() {
   // ==========================================
   
   // 🔥 PEGA LA FUNCIÓN AQUÍ (ESTE ES EL LUGAR CORRECTO):
+// 🔥 CORRECCIÓN: Guardar estado visual junto con el plan
   async function createAutoPlan(problems) {
       const result = await Swal.fire({
           title: '✨ Crear Plan Automático',
           html: `
               <div class="text-left">
-                  <p class="mb-3 text-sm text-gray-600">Se crearán ${problems.length} tratamientos:</p>
-                  <ul class="space-y-2 text-sm">
+                  <p class="mb-3 text-sm text-gray-600">Se crearán ${problems.length} tratamientos y se guardará el estado actual:</p>
+                  <ul class="space-y-2 text-sm max-h-40 overflow-y-auto">
                       ${problems.map(p => `
                           <li class="flex justify-between items-center p-2 bg-gray-50 rounded">
                               <span>🦷 ${p.tooth} - ${p.treatment}</span>
@@ -1010,86 +1027,100 @@ function renderTreatmentPlanSummary() {
           `,
           icon: 'question',
           showCancelButton: true,
-          confirmButtonText: 'Sí, crear plan',
+          confirmButtonText: 'Sí, crear y guardar',
           confirmButtonColor: 'rgb(var(--color-brand))'
       });
 
       if (result.isConfirmed) {
-          Swal.fire({ title: 'Creando plan...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+          Swal.fire({ title: 'Procesando...', text: 'Guardando plan y odontograma...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
           
-          const treatments = problems.map(p => ({
-              patient_id: patientId,
-              business_id: businessId,
-              tooth_number: p.tooth,
-              diagnosis: p.issue,
-              treatment_type: p.treatment,
-              priority: p.priority,
-              estimated_cost: p.cost,
-              status: 'draft'
-          }));
+          try {
+              // 1. Guardar Tratamientos
+              const treatments = problems.map(p => ({
+                  patient_id: patientId,
+                  business_id: businessId,
+                  tooth_number: p.tooth,
+                  diagnosis: p.issue,
+                  treatment_type: p.treatment,
+                  priority: p.priority,
+                  estimated_cost: p.cost,
+                  status: 'draft'
+              }));
 
-          const { error } = await supabase.from('treatment_plans').insert(treatments);
-          
-          if (error) {
-              Swal.fire('Error', error.message, 'error');
-          } else {
+              const { error: planError } = await supabase.from('treatment_plans').insert(treatments);
+              if (planError) throw planError;
+
+              // 2. 🔥 GUARDAR ODONTOGRAMA (CRÍTICO)
+              // Esto asegura que al recargar, los dientes sigan pintados
+              const { error: odontoError } = await supabase.from('clinical_records').insert({
+                  business_id: businessId,
+                  patient_id: patientId,
+                  record_type: 'odontogram',
+                  description: 'Actualización automática por creación de plan',
+                  data: mouthState, // <--- Aquí guardamos lo que pintaste
+                  dentist_id: null // O el usuario actual si lo tienes
+              });
+
+              if (odontoError) throw odontoError;
+
               await Swal.fire({ icon: 'success', title: '¡Plan Creado!', timer: 1500, showConfirmButton: false });
               window.location.reload();
+
+          } catch (e) {
+              console.error(e);
+              Swal.fire('Error', 'No se pudieron guardar los cambios. Intenta de nuevo.', 'error');
           }
       }
   }
 
 document.getElementById('approve-plan-btn')?.addEventListener('click', async () => {
+
+  const drafts = treatmentPlans.filter(t => t.status === 'draft');
+  if (drafts.length === 0) {
+    Swal.fire('Atención', 'No hay tratamientos pendientes por aprobar', 'info');
+    return;
+  }
+
   const result = await Swal.fire({
-    title: 'Aprobar plan de tratamiento',
-    text: 'Al aprobar el plan se bloqueará el odontograma.',
+    title: '🔒 Aprobar Plan de Tratamiento',
+    html: `
+      <p class="text-sm text-gray-600 mb-3">
+        Se aprobarán <b>${drafts.length}</b> procedimientos.
+      </p>
+      <div class="bg-blue-50 p-3 rounded text-xs text-blue-800 border border-blue-100">
+        🛡 Se generará una versión legal inmutable del odontograma.
+      </div>
+    `,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: 'Sí, aprobar',
+    confirmButtonText: 'Aprobar y Congelar',
     confirmButtonColor: '#059669'
   });
 
   if (!result.isConfirmed) return;
 
-  Swal.fire({ title: 'Aprobando...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+  Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
 
-  // 1️⃣ Aprobar todos los draft
-  const { error: updateError } = await supabase
-    .from('treatment_plans')
-    .update({ status: 'approved' })
-    .eq('patient_id', patientId)
-    .eq('status', 'draft');
+  const { error } = await supabase.rpc('approve_plan_and_freeze', {
+    p_business_id: businessId,
+    p_patient_id: patientId,
+    p_dentist_id: drafts[0]?.dentist_id ?? null,
+    p_snapshot: structuredClone(mouthState),
+    p_note: `Plan aprobado con ${drafts.length} procedimientos`
+  });
 
-  if (updateError) {
-    console.error(updateError);
-    Swal.fire('Error', updateError.message, 'error');
+  if (error) {
+    console.error(error);
+    Swal.fire('Error', error.message, 'error');
     return;
   }
 
-  // 2️⃣ Registrar auditoría
-  const { error: auditError } = await supabase
-    .from('clinical_audit')
-    .insert({
-      business_id: businessId,
-      patient_id: patientId,
-      event_type: 'PLAN_APPROVED',
-      description: 'Plan de tratamiento aprobado',
-      payload: {
-        treatments: clinicalEngineState.problems,
-        approvedAt: new Date().toISOString()
-      }
-    });
-
-  if (auditError) {
-    console.error('❌ Error guardando auditoría:', auditError);
-    Swal.fire('Error crítico', auditError.message, 'error');
-    return;
-  }
-
-  // 3️⃣ Refrescar estado
-  await Swal.fire({ icon: 'success', title: 'Plan aprobado', timer: 1200, showConfirmButton: false });
+  await Swal.fire({ icon: 'success', title: 'Plan aprobado', timer: 1800, showConfirmButton: false });
   window.location.reload();
 });
+
+
+
 
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.delete-treatment-btn');
@@ -1340,6 +1371,11 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
   // Guardar Odontograma
   // Guardar Odontograma (Snapshot Mejorado)
   document.getElementById('save-odontogram-btn')?.addEventListener('click', async () => {
+    // 🔥 MEJORA : Evitar guardar vacío
+      if (Object.keys(mouthState).length === 0) {
+          Swal.fire('Nada para guardar', 'El odontograma está vacío, marca algún diente primero.', 'info');
+          return;
+      }
       let dentistOptions = '';
       dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
       
@@ -1390,6 +1426,52 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
           }
       }
   });
+
+  document.getElementById('view-legal-versions-btn')?.addEventListener('click', async () => {
+
+  Swal.fire({ title: 'Cargando versiones legales...', didOpen: () => Swal.showLoading() });
+
+  const { data: versions, error } = await supabase
+    .from('odontogram_versions')
+    .select('*, dentists(name)')
+    .eq('patient_id', patientId)
+    .order('created_at', { ascending: false });
+
+  if (error || !versions?.length) {
+    Swal.fire('Sin versiones', 'No existen versiones congeladas.', 'info');
+    return;
+  }
+
+  const options: any = {};
+  versions.forEach((v, i) => {
+    const date = new Date(v.created_at).toLocaleString('es-CO');
+    options[i] = `📅 ${date} — ${v.dentists?.name || 'Sistema'} — ${v.version_type}`;
+  });
+
+  const { value: index } = await Swal.fire({
+    title: '🧬 Versiones del Plan',
+    input: 'select',
+    inputOptions: options,
+    inputPlaceholder: 'Selecciona una versión',
+    showCancelButton: true,
+    confirmButtonText: 'Ver'
+  });
+
+  if (index !== undefined) {
+    const selected = versions[index];
+
+    // 🔧 ADAPTADOR: convertir snapshot → formato esperado por el visor
+    const adapted = {
+      ...selected,
+      data: selected.snapshot
+    };
+
+    window.viewOdontogramSnapshot(
+      encodeURIComponent(JSON.stringify(adapted))
+    );
+  }
+});
+
 
   // Ver Snapshot (Ver el gráfico del pasado)
   // Helper para generar SVG estático
@@ -1906,23 +1988,63 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
       if (result.isConfirmed) { const { error } = await supabase.from('patients').delete().eq('id', patientId); if (error) Swal.fire('Error', error.message, 'error'); else window.location.href = '/admin/pacientes'; }
   });
 
+  
+// 🧬 FUNCIÓN DE SEGURIDAD: RESTAURAR DESDE BD (Cliente)
+async function loadLastOdontogram() {
+  if (!patientId) return;
+
+  // Consultamos el último registro tipo 'odontogram'
+  const { data, error } = await supabase
+    .from('clinical_records')
+    .select('data')
+    .eq('patient_id', patientId)
+    .eq('record_type', 'odontogram')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle(); // Usamos maybeSingle para que no de error si es el primer paciente sin historia
+
+  // Si encontramos datos, sobreescribimos el estado inicial
+  if (!error && data?.data) {
+    console.log("🔄 Odontograma sincronizado desde historial reciente");
+    mouthState = data.data; // Actualizamos la variable global
+    
+    // Forzamos el repintado
+    updateVisuals();
+    detectProblems();
+  }
+}
+
+
 // ==========================================
 // 🚀 BOOTSTRAPPER / CICLO DE VIDA CENTRAL
 // ==========================================
-function mountApplication() {
-    // 1. Inicializar odontograma (UNA sola vez)
+// ==========================================
+// 🚀 BOOTSTRAPPER / CICLO DE VIDA CENTRAL
+// ==========================================
+async function mountApplication() { // <--- Ahora es ASYNC
+    // 1. Inicializar odontograma (Dibuja la estructura blanca vacía)
     initOdontogram();
 
-    // 2. Aplicar estado visual después del primer frame
+    // 2. 🔥 RECUPERACIÓN DE ESTADO: 
+    // Esperamos a consultar la BD para tener la "verdad" más reciente
+    await loadLastOdontogram(); 
+
+    // 🔥 MEJORA B: Bloqueo visual global si hay plan aprobado
+    if (clinicalEngineState.hasApprovedPlan) {
+        document.body.classList.add('plan-locked');
+    }
+
+    // 3. Aplicar estado visual final (Pinta colores y capas)
     requestAnimationFrame(() => {
-        updateVisuals();
+        updateVisuals(); 
+        detectProblems(); // Calcula presupuesto
     });
 
-    // 3. Renderizar timeline
+    // 4. Renderizar resto de la UI
     renderTimeline();
-
-    // 4. Activar tab inicial
-    switchTab('tab-history');
+    
+    // Opcional: Si quieres que arranque siempre en el tab de historial o odontograma
+    // switchTab('tab-odontogram'); 
 }
 
 // Esperar DOM listo
@@ -2031,4 +2153,13 @@ if (document.readyState === 'loading') {
   .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   .swal-opt:hover { background-color: #f3f4f6; }
+
+  /* Bloqueo visual cuando el plan está aprobado */
+body.plan-locked .tooth-group {
+    cursor: not-allowed !important;
+    opacity: 0.8;
+}
+body.plan-locked #save-odontogram-btn {
+    display: none; /* Ocultar botón guardar si está bloqueado */
+}
 </style>

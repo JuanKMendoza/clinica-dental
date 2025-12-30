@@ -2,70 +2,61 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { supabase } from "../../lib/supabase";
 
-// AUTH
+// 1. AUTH
 const accessToken = Astro.cookies.get("sb-access-token")?.value;
 const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
 
-if (!accessToken || !refreshToken) {
+if (accessToken && refreshToken) {
+  await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+} else {
   return Astro.redirect("/admin/login");
 }
 
-await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-
-// USER
-const { data: { user } } = await supabase.auth.getUser();
-if (!user) return Astro.redirect("/admin/login");
-
-// PROFILE
-const { data: profile } = await supabase
-  .from("profiles")
-  .select("business_id, role")
-  .eq("id", user.id)
-  .single();
-
-if (!profile) throw new Error("Profile missing");
-
-const businessId = profile.business_id;
-
-// 🔥 ESTA LÍNEA FALTABA
-const defaultBusinessId = businessId;
-
-// DATA
+// 2. DATOS
 const { data: appointments } = await supabase
   .from("appointments")
-  .select(`*, services(name,duration,price), dentists(name)`)
+  .select(`*, services (name, duration, price), dentists (name)`)
   .order("appointment_date", { ascending: false })
   .order("appointment_time", { ascending: true });
 
 const { data: servicesList } = await supabase
   .from("services")
-  .select("id,name")
+  .select("id, name, business_id")
   .eq("is_active", true)
   .order("name");
-
 const { data: dentistsList } = await supabase
   .from("dentists")
-  .select("id,name")
+  .select("id, name")
   .eq("is_active", true)
   .order("name");
+const defaultBusinessId = servicesList?.[0]?.business_id || "";
 
 const { data: businessData } = await supabase
   .from("businesses")
   .select("name, primary_color, logo_url, address")
-  .eq("id", businessId)
+  .eq("id", defaultBusinessId)
   .single();
 
-// METRICS
-const safeAppointments = appointments ?? [];
-const pending = safeAppointments.filter(a => a.status === "pending").length;
-const confirmed = safeAppointments.filter(a => a.status === "confirmed").length;
-const cancelled = safeAppointments.filter(a => a.status === "cancelled").length;
-const completed = safeAppointments.filter(a => a.status === "completed").length;
+const pending = appointments?.filter((a) => a.status === "pending").length || 0;
+const confirmed =
+  appointments?.filter((a) => a.status === "confirmed").length || 0;
+const cancelled =
+  appointments?.filter((a) => a.status === "cancelled").length || 0;
+const completed =
+  appointments?.filter((a) => a.status === "completed").length || 0;
+// ====================
 
 const getInitials = (name: string) =>
-  name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+  name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
 ---
-
 
 <AdminLayout title="Gestión de Citas">
   <!-- 1. INYECCIÓN DE DEPENDENCIAS (FullCalendar) -->
