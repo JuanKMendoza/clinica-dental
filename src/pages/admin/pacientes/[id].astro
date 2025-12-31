@@ -129,18 +129,35 @@ export const formatCOP = (value: number | string) =>
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                 <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Próximas Citas</h3>
                 <div class="space-y-3">
-                    {appointments && appointments.filter(a => new Date(a.appointment_date) >= new Date()).length > 0 ? (
-                        appointments.filter(a => new Date(a.appointment_date) >= new Date()).slice(0, 3).map(a => (
+                    {appointments && appointments.filter(a => {
+                        // 🔥 FIX: Normalizar fechas para incluir HOY sin problemas de hora
+                        const apptDate = new Date(a.appointment_date + 'T00:00:00');
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0); // Resetear hora actual a 00:00
+                        return apptDate >= today && a.status !== 'cancelled';
+                    }).length > 0 ? (
+                        appointments.filter(a => {
+                            const apptDate = new Date(a.appointment_date + 'T00:00:00');
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return apptDate >= today && a.status !== 'cancelled';
+                        })
+                        .slice(0, 3) // Mostrar solo las 3 más próximas
+                        .map(a => (
                             <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 relative group">
-                                <!-- 🔥 FIX: ZONA HORARIA LOCAL -->
+                                <!-- Fecha Visual -->
                                 <div class="bg-white border border-gray-200 rounded px-2 py-1 text-center min-w-[50px]">
                                     <span class="block text-xs font-bold text-gray-500 uppercase">{new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('es-CO', {month: 'short'})}</span>
                                     <span class="block text-lg font-bold text-gray-900 leading-none">{new Date(a.appointment_date + 'T00:00:00').getDate()}</span>
                                 </div>
+                                
+                                <!-- Info Cita -->
                                 <div>
                                     <p class="text-sm font-bold text-gray-900">{a.services?.name}</p>
                                     <p class="text-xs text-gray-500">🕒 {a.appointment_time.slice(0,5)} - Dr. {a.dentists?.name?.split(' ')[0]}</p>
                                 </div>
+
+                                <!-- Acciones Flotantes -->
                                 <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md shadow-sm p-0.5">
                                     <button class="text-blue-500 hover:bg-blue-50 p-1 rounded edit-appt-btn" 
                                         data-id={a.id} data-date={a.appointment_date} data-time={a.appointment_time} title="Editar">
@@ -2268,6 +2285,9 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
 
   // Quick Book (Agendar desde Ficha)
   // FUNCIÓN UNIFICADA DE AGENDAMIENTO
+ // ==========================================
+  // 🎯 AGENDAR DESDE LISTA (MODAL UNIFICADO)
+  // ==========================================
   async function openBookingModal(preServiceId = '', preDentistId = '') {
       // Generar opciones marcando como selected si coinciden
       let serviceOpts = '<option value="">Selecciona...</option>';
@@ -2301,10 +2321,10 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
           confirmButtonText: 'Agendar',
           confirmButtonColor: 'rgb(var(--color-brand))',
           preConfirm: () => ({ 
-              service_id: (document.getElementById('s') ).value, 
+              service_id: (document.getElementById('s') as HTMLSelectElement).value, 
               appointment_date: (document.getElementById('d') as HTMLInputElement).value, 
               appointment_time: (document.getElementById('t') as HTMLInputElement).value, 
-              dentist_id: (document.getElementById('doc') ).value 
+              dentist_id: (document.getElementById('doc') as HTMLSelectElement).value 
           })
       });
 
@@ -2316,26 +2336,47 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
           const serviceName = services.find((s:any) => s.id === f.service_id)?.name || "Servicio";
           const dentistName = dentists.find((d:any) => d.id === f.dentist_id)?.name || "Asignado";
 
+          // 🔥 CORRECCIÓN: Leer Branding para el Email
+          const brandingData = pageData?.dataset.branding ? JSON.parse(pageData.dataset.branding) : {};
+
           try {
-              await fetch("/api/appointments/create", { 
+              const response = await fetch("/api/appointments/create", { 
                   method: "POST", 
                   headers: { "Content-Type": "application/json" }, 
                   body: JSON.stringify({ 
-                      ...f, 
-                      ...branding, 
+                      // Datos Operativos
                       business_id: businessId, 
+                      service_id: f.service_id, 
+                      appointment_date: f.appointment_date, 
+                      appointment_time: f.appointment_time, 
+                      dentist_id: f.dentist_id,
                       customer_name: patientInfo.name, 
                       customer_email: patientInfo.email, 
                       customer_phone: patientInfo.phone, 
                       patient_doc: patientInfo.doc, 
                       status: 'confirmed',
-                      service_name: serviceName, // Para el email
-                      dentist_name: dentistName  // Para el email
+                      
+                      // Datos para Email (Branding)
+                      service_name: serviceName, 
+                      dentist_name: dentistName,
+                      business_name: brandingData.name || "Clínica Dental", 
+                      brand_color: brandingData.color || "#2563EB", 
+                      logo_url: brandingData.logo || "", 
+                      business_address: brandingData.address || ""
                   }) 
               });
+
+              // Manejo seguro de respuesta
+              const text = await response.text();
+              let result;
+              try { result = text ? JSON.parse(text) : {}; } catch(e) {}
+
+              if(!response.ok) throw new Error(result?.error || "Error al agendar");
+
               await Swal.fire({ icon: 'success', title: 'Cita Agendada', timer: 1500, showConfirmButton: false });
               window.location.reload();
           } catch (e: any) {
+              console.error(e);
               Swal.fire('Error', e.message, 'error');
           }
       }
