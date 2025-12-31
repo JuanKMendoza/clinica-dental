@@ -596,43 +596,125 @@ export const formatCOP = (value: number | string) =>
   // Activar primera tab por defecto al cargar
   //switchTab('tab-history');
 
+  // ==========================================
+  // 🎯 QUICK BOOK (AGENDAR AHORA) - CORREGIDO
+  // ==========================================
   document.getElementById('quick-book-btn')?.addEventListener('click', async () => {
+      
+      // 1. Validaciones previas de seguridad
+      if (!dentists || !services) {
+          Swal.fire('Error de carga', 'Espera un momento a que carguen los datos.', 'warning');
+          return;
+      }
+
+      // Preparar opciones
       let dentistOptions = '<option value="">Cualquiera</option>';
       dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+      
       let serviceOptions = '<option value="">Selecciona...</option>';
       services.forEach((s: any) => serviceOptions += `<option value="${s.id}">${s.name}</option>`);
 
+      // 2. Modal
       const { value: formValues } = await Swal.fire({
           title: `Cita para ${patientInfo.name}`,
-          html: `<div class="flex flex-col gap-3 text-left"><div><label class="text-xs font-bold text-gray-500 uppercase">Servicio *</label><select id="qb-service" class="swal2-input m-0 w-full text-sm">${serviceOptions}</select></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500 uppercase">Fecha *</label><input id="qb-date" type="date" class="swal2-input m-0 w-full text-sm"></div><div><label class="text-xs font-bold text-gray-500 uppercase">Hora *</label><input id="qb-time" type="time" class="swal2-input m-0 w-full text-sm"></div></div><div><label class="text-xs font-bold text-gray-500 uppercase">Doctor</label><select id="qb-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div></div>`,
-          showCancelButton: true, confirmButtonText: 'Agendar', confirmButtonColor: 'rgb(var(--color-brand))',
-          preConfirm: () => ({ service: (document.getElementById('qb-service') as HTMLSelectElement).value, date: (document.getElementById('qb-date') as HTMLInputElement).value, time: (document.getElementById('qb-time') as HTMLInputElement).value, dentist: (document.getElementById('qb-dentist') as HTMLSelectElement).value })
+          html: `
+            <div class="flex flex-col gap-3 text-left">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Servicio *</label>
+                    <select id="qb-service" class="swal2-input m-0 w-full text-sm">${serviceOptions}</select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">Fecha *</label>
+                        <input id="qb-date" type="date" class="swal2-input m-0 w-full text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">Hora *</label>
+                        <input id="qb-time" type="time" class="swal2-input m-0 w-full text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Doctor</label>
+                    <select id="qb-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select>
+                </div>
+            </div>`,
+          showCancelButton: true, 
+          confirmButtonText: 'Agendar', 
+          confirmButtonColor: 'rgb(var(--color-brand))',
+          preConfirm: () => ({ 
+              service: (document.getElementById('qb-service') as HTMLSelectElement).value, 
+              date: (document.getElementById('qb-date') as HTMLInputElement).value, 
+              time: (document.getElementById('qb-time') as HTMLInputElement).value, 
+              dentist: (document.getElementById('qb-dentist') as HTMLSelectElement).value 
+          })
       });
 
+      // 3. Procesamiento
       if (formValues) {
-          if(!formValues.service || !formValues.date || !formValues.time) return Swal.fire('Faltan datos', '', 'warning');
+          if(!formValues.service || !formValues.date || !formValues.time) {
+             return Swal.fire('Faltan datos', 'Servicio, fecha y hora son obligatorios', 'warning');
+          }
+
           Swal.fire({ title: 'Agendando...', didOpen: () => Swal.showLoading() });
+          
           try {
-              const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio";
-              const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Asignado";
+              // Obtener nombres para el email
+              const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio General";
+              const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Profesional Asignado";
               
-              // 🔥 DATOS DE MARCA CORREGIDOS
-              const branding = JSON.parse(pageData?.dataset.branding || '{}');
+              // 🔥 LEER BRANDING DE FORMA SEGURA (Aquí estaba el riesgo)
+              const brandingData = pageData?.dataset.branding ? JSON.parse(pageData.dataset.branding) : {};
+              
+              const payload = {
+                  business_id: businessId, 
+                  service_id: formValues.service, 
+                  dentist_id: formValues.dentist || null, 
+                  customer_name: patientInfo.name, 
+                  customer_email: patientInfo.email, 
+                  customer_phone: patientInfo.phone, 
+                  patient_doc: patientInfo.doc, 
+                  appointment_date: formValues.date, 
+                  appointment_time: formValues.time, 
+                  status: "confirmed", 
+                  is_first_visit: false, 
+                  marketing_source: "Admin Panel (Ficha)",
+                  // Datos Email
+                  service_name: serviceName, 
+                  dentist_name: dentistName,
+                  business_name: brandingData.name || "Clínica Dental", 
+                  brand_color: brandingData.color || "#2563EB", 
+                  logo_url: brandingData.logo || "", 
+                  business_address: brandingData.address || ""
+              };
+
+              console.log("Enviando payload:", payload); // Debugging
 
               const response = await fetch("/api/appointments/create", {
-                  method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                      business_id: businessId, service_id: formValues.service, dentist_id: formValues.dentist || null, customer_name: patientInfo.name, customer_email: patientInfo.email, customer_phone: patientInfo.phone, patient_doc: patientInfo.doc, appointment_date: formValues.date, appointment_time: formValues.time, status: "confirmed", is_first_visit: false, marketing_source: "Admin Panel (Ficha)",
-                      // Datos Email
-                      service_name: serviceName, dentist_name: dentistName,
-                      business_name: branding.name, brand_color: branding.color, logo_url: branding.logo, business_address: branding.address
-                  })
+                  method: "POST", 
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
               });
-              const result = await response.json();
-              if(!response.ok) throw new Error(result.error);
+
+              // 🔥 MANEJO DE RESPUESTA A PRUEBA DE FALLOS (Fix del JSON error)
+              const textResponse = await response.text(); // Leemos texto primero
+              
+              if (!response.ok) {
+                  console.error("Error del servidor:", textResponse);
+                  throw new Error(`Error del servidor: ${response.statusText}`);
+              }
+
+              // Intentar parsear solo si hay contenido
+              const result = textResponse ? JSON.parse(textResponse) : {};
+
+              if(result.error) throw new Error(result.error);
+
               await Swal.fire({ icon: 'success', title: 'Cita Agendada', timer: 1500, showConfirmButton: false });
               window.location.reload();
-          } catch (e: any) { Swal.fire('Error', e.message, 'error'); }
+
+          } catch (e: any) { 
+              console.error(e);
+              Swal.fire('Error', `No se pudo agendar: ${e.message}`, 'error'); 
+          }
       }
   });
 
