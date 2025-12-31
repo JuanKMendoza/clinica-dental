@@ -596,6 +596,46 @@ export const formatCOP = (value: number | string) =>
   // Activar primera tab por defecto al cargar
   //switchTab('tab-history');
 
+  document.getElementById('quick-book-btn')?.addEventListener('click', async () => {
+      let dentistOptions = '<option value="">Cualquiera</option>';
+      dentists.forEach((d: any) => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
+      let serviceOptions = '<option value="">Selecciona...</option>';
+      services.forEach((s: any) => serviceOptions += `<option value="${s.id}">${s.name}</option>`);
+
+      const { value: formValues } = await Swal.fire({
+          title: `Cita para ${patientInfo.name}`,
+          html: `<div class="flex flex-col gap-3 text-left"><div><label class="text-xs font-bold text-gray-500 uppercase">Servicio *</label><select id="qb-service" class="swal2-input m-0 w-full text-sm">${serviceOptions}</select></div><div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-bold text-gray-500 uppercase">Fecha *</label><input id="qb-date" type="date" class="swal2-input m-0 w-full text-sm"></div><div><label class="text-xs font-bold text-gray-500 uppercase">Hora *</label><input id="qb-time" type="time" class="swal2-input m-0 w-full text-sm"></div></div><div><label class="text-xs font-bold text-gray-500 uppercase">Doctor</label><select id="qb-dentist" class="swal2-input m-0 w-full text-sm">${dentistOptions}</select></div></div>`,
+          showCancelButton: true, confirmButtonText: 'Agendar', confirmButtonColor: 'rgb(var(--color-brand))',
+          preConfirm: () => ({ service: (document.getElementById('qb-service') as HTMLSelectElement).value, date: (document.getElementById('qb-date') as HTMLInputElement).value, time: (document.getElementById('qb-time') as HTMLInputElement).value, dentist: (document.getElementById('qb-dentist') as HTMLSelectElement).value })
+      });
+
+      if (formValues) {
+          if(!formValues.service || !formValues.date || !formValues.time) return Swal.fire('Faltan datos', '', 'warning');
+          Swal.fire({ title: 'Agendando...', didOpen: () => Swal.showLoading() });
+          try {
+              const serviceName = services.find((s:any) => s.id === formValues.service)?.name || "Servicio";
+              const dentistName = dentists.find((d:any) => d.id === formValues.dentist)?.name || "Asignado";
+              
+              // 🔥 DATOS DE MARCA CORREGIDOS
+              const branding = JSON.parse(pageData?.dataset.branding || '{}');
+
+              const response = await fetch("/api/appointments/create", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                      business_id: businessId, service_id: formValues.service, dentist_id: formValues.dentist || null, customer_name: patientInfo.name, customer_email: patientInfo.email, customer_phone: patientInfo.phone, patient_doc: patientInfo.doc, appointment_date: formValues.date, appointment_time: formValues.time, status: "confirmed", is_first_visit: false, marketing_source: "Admin Panel (Ficha)",
+                      // Datos Email
+                      service_name: serviceName, dentist_name: dentistName,
+                      business_name: branding.name, brand_color: branding.color, logo_url: branding.logo, business_address: branding.address
+                  })
+              });
+              const result = await response.json();
+              if(!response.ok) throw new Error(result.error);
+              await Swal.fire({ icon: 'success', title: 'Cita Agendada', timer: 1500, showConfirmButton: false });
+              window.location.reload();
+          } catch (e: any) { Swal.fire('Error', e.message, 'error'); }
+      }
+  });
+
 
  // ==========================================
   // 3. MOTOR GRÁFICO PREMIUM (CORREGIDO - NO MÁS CUADROS NEGROS)
