@@ -388,6 +388,7 @@ export const formatCOP = (value: number | string) =>
                                                 data-id={t.id}
                                                 data-tooth={t.tooth_number}
                                                 data-treatment={t.treatment_type}
+                                                data-diagnosis={t.diagnosis}
                                             >
                                                 ⚡ Realizar Procedimiento
                                             </button>
@@ -852,13 +853,22 @@ export const formatCOP = (value: number | string) =>
 
   function updateVisuals() {
       // 1. Resetear visuales (Forzar blanco y ocultar capas)
-      document.querySelectorAll('.tooth-group').forEach(g => g.className.baseVal = 'tooth-group');
+      document.querySelectorAll('.tooth-group').forEach(g => {
+          g.classList.remove('has-ausente', 'has-corona', 'has-corona-ok', 'has-endodoncia', 'has-implante');
+      });
+      
+      // Limpiar superficies
       document.querySelectorAll('.tooth-surface').forEach(s => {
           s.classList.remove('state-caries', 'state-resina', 'state-sellante');
           s.setAttribute('fill', 'white'); 
       });
-      // Ocultar todas las capas explícitamente
-      document.querySelectorAll('.layer-ausente, .layer-corona, .layer-endo, .layer-implante').forEach(l => l.style.opacity = '0');
+
+      // 🔥 RESETEAR CAPAS MANUALMENTE (Para asegurar limpieza)
+      document.querySelectorAll('.layer-corona').forEach(c => {
+          c.setAttribute('fill', 'none'); 
+          c.style.opacity = '0';
+      });
+      document.querySelectorAll('.layer-ausente, .layer-endo, .layer-implante').forEach(l => l.style.opacity = '0');
 
       // 2. Aplicar estado
       Object.keys(mouthState).forEach(key => {
@@ -868,14 +878,30 @@ export const formatCOP = (value: number | string) =>
           const group = document.getElementById(`tooth-${toothNum}`);
           if (!group) return;
 
-          // Afecta capas (Manipulación directa de estilo para garantizar visibilidad)
+          // --- ESTADOS GLOBALES ---
+          
           if (status === 'ausente') {
               group.classList.add('has-ausente');
               group.querySelector('.layer-ausente').style.opacity = '1';
           } 
-          else if (status === 'corona') {
+          else if (status === 'corona') { 
+              // Diagnóstico: Vacío
               group.classList.add('has-corona');
-              group.querySelector('.layer-corona').style.opacity = '1';
+              const corona = group.querySelector('.layer-corona');
+              if (corona) {
+                  corona.style.opacity = '1';
+                  corona.setAttribute('fill', 'none'); // Asegurar vacío
+              }
+          }
+          else if (status === 'corona_ok') { 
+              // 🔥 TRATAMIENTO REALIZADO: FORZAR RELLENO AQUÍ
+              group.classList.add('has-corona-ok');
+              const corona = group.querySelector('.layer-corona');
+              if (corona) {
+                  corona.style.opacity = '1';
+                  corona.setAttribute('fill', '#eab308'); // Relleno directo
+                  corona.setAttribute('fill-opacity', '0.5'); // Transparencia directa
+              }
           }
           else if (status === 'endodoncia') {
               group.classList.add('has-endodoncia');
@@ -885,21 +911,21 @@ export const formatCOP = (value: number | string) =>
               group.classList.add('has-implante');
               group.querySelector('.layer-implante').style.opacity = '1';
           }
-          // Afecta superficies (Colores)
+          
+          // --- ESTADOS SUPERFICIE ---
           else {
             const selectorPart = part || 'center';
-            const surface = group.querySelector(
-                `.tooth-surface[data-part="${selectorPart}"]`
-            );
+            const surface = group.querySelector(`.tooth-surface[data-part="${selectorPart}"]`);
 
-            if (!surface) return;
-
-            if (status === 'caries') surface.setAttribute('fill', '#ef4444');
-            if (status === 'resina') surface.setAttribute('fill', '#3b82f6');
-            if (status === 'sellante') surface.setAttribute('fill', '#22c55e');
+            if (surface) {
+                if (status === 'caries') surface.setAttribute('fill', '#ef4444');
+                if (status === 'resina') surface.setAttribute('fill', '#3b82f6');
+                if (status === 'sellante') surface.setAttribute('fill', '#22c55e');
             }
+          }
       });
   }
+
   function attachToothListeners() {
     const canvas = document.getElementById('odontogram-canvas');
     // Limpiar listener previo asignando null antes (simple safety)
@@ -1322,7 +1348,6 @@ document.getElementById('approve-plan-btn')?.addEventListener('click', async () 
   
   drafts.forEach((t: any) => {
       totalSum += Number(t.estimated_cost);
-      // Checkbox pre-marcado
       itemsHtml += `
         <div class="flex items-center justify-between p-2 border-b border-gray-100 last:border-0 hover:bg-gray-50">
             <div class="flex items-center gap-3">
@@ -1362,7 +1387,7 @@ document.getElementById('approve-plan-btn')?.addEventListener('click', async () 
     confirmButtonColor: '#059669',
     cancelButtonText: 'Cancelar',
     didOpen: () => {
-        // Lógica para actualizar el total dinámicamente al desmarcar
+        // Actualizar total dinámicamente
         const checkboxes = document.querySelectorAll('.plan-checkbox');
         const totalLabel = document.getElementById('approval-total');
         
@@ -1377,7 +1402,6 @@ document.getElementById('approve-plan-btn')?.addEventListener('click', async () 
         });
     },
     preConfirm: () => {
-        // Recolectar IDs seleccionados
         const selectedIds = [];
         document.querySelectorAll('.plan-checkbox:checked').forEach((cb: any) => {
             selectedIds.push(cb.value);
@@ -1397,14 +1421,17 @@ document.getElementById('approve-plan-btn')?.addEventListener('click', async () 
 
   Swal.fire({ title: 'Aprobando...', text: 'Generando contrato digital...', didOpen: () => Swal.showLoading(), showConfirmButton: false });
 
-  // 4. Llamada a la RPC Actualizada
+  // 4. Llamada a la RPC (BLINDADA)
+  // 🔥 AQUÍ ESTÁ TU CÓDIGO VALIDADO
+  const snapshotToFreeze = structuredClone(mouthState);
+
   const { error } = await supabase.rpc('approve_plan_and_freeze', {
     p_business_id: businessId,
     p_patient_id: patientId,
     p_dentist_id: drafts[0]?.dentist_id ?? null,
-    p_snapshot: structuredClone(mouthState),
+    p_snapshot: snapshotToFreeze, // Copia segura
     p_note: `Aprobación parcial de plan (${selectedIds.length} procedimientos)`,
-    p_treatment_ids: selectedIds // <--- Enviamos el array de IDs
+    p_treatment_ids: selectedIds
   });
 
   if (error) {
@@ -1417,147 +1444,14 @@ document.getElementById('approve-plan-btn')?.addEventListener('click', async () 
   window.location.reload();
 });
 
-
-
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.delete-treatment-btn');
-  if (!btn) return;
-
-  if (clinicalEngineState.hasApprovedPlan) {
-    Swal.fire('Plan aprobado', 'No se pueden modificar tratamientos', 'info');
-    return;
-  }
-
-  const treatmentId = btn.dataset.id;
-
-  const confirm = await Swal.fire({
-    title: 'Eliminar tratamiento',
-    text: 'Este cambio no se puede deshacer.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Eliminar',
-    confirmButtonColor: '#dc2626'
-  });
-
-  if (!confirm.isConfirmed) return;
-
-  const { error } = await supabase
-    .from('treatment_plans')
-    .delete()
-    .eq('id', treatmentId);
-
-  if (error) {
-    Swal.fire('Error', error.message, 'error');
-    return;
-  }
-
-  await supabase.from('clinical_audit').insert({
-    business_id: businessId,
-    patient_id: patientId,
-    event_type: 'TREATMENT_DELETED',
-    description: 'Tratamiento eliminado',
-    payload: { treatmentId }
-  });
-
-  await Swal.fire({ icon: 'success', title: 'Tratamiento eliminado', timer: 1200, showConfirmButton: false });
-
-  window.location.reload();
-});
-
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.edit-treatment-btn');
-  if (!btn) return;
-
-  if (clinicalEngineState.hasApprovedPlan) {
-    Swal.fire('Plan aprobado', 'No se pueden modificar tratamientos', 'info');
-    return;
-  }
-
-  const treatmentId = btn.dataset.id;
-
-  const { data: treatment } = await supabase
-    .from('treatment_plans')
-    .select('*')
-    .eq('id', treatmentId)
-    .single();
-
-  if (!treatment) return;
-
-  const { value: formValues } = await Swal.fire({
-    title: '✏️ Editar Tratamiento',
-    html: `
-      <div class="grid gap-3 text-left">
-        <div>
-          <label class="text-xs font-bold text-gray-500">Diente</label>
-          <input id="edit-tooth" value="${treatment.tooth_number}" class="swal2-input m-0 w-full">
-        </div>
-        <div>
-          <label class="text-xs font-bold text-gray-500">Diagnóstico</label>
-          <input id="edit-diagnosis" value="${treatment.diagnosis}" class="swal2-input m-0 w-full">
-        </div>
-        <div>
-          <label class="text-xs font-bold text-gray-500">Tratamiento</label>
-          <input id="edit-type" value="${treatment.treatment_type}" class="swal2-input m-0 w-full">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-xs font-bold text-gray-500">Prioridad</label>
-            <select id="edit-priority" class="swal2-input m-0 w-full">
-              <option ${treatment.priority === 'normal' ? 'selected' : ''}>normal</option>
-              <option ${treatment.priority === 'urgent' ? 'selected' : ''}>urgent</option>
-              <option ${treatment.priority === 'cosmetic' ? 'selected' : ''}>cosmetic</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-bold text-gray-500">Costo</label>
-            <input id="edit-cost" type="number" value="${treatment.estimated_cost}" class="swal2-input m-0 w-full">
-          </div>
-        </div>
-      </div>
-    `,
-    showCancelButton: true,
-    confirmButtonText: 'Guardar cambios',
-    confirmButtonColor: 'rgb(var(--color-brand))'
-  });
-
-  if (!formValues) return;
-
-  const { error } = await supabase
-    .from('treatment_plans')
-    .update({
-      tooth_number: document.getElementById('edit-tooth').value,
-      diagnosis: document.getElementById('edit-diagnosis').value,
-      treatment_type: document.getElementById('edit-type').value,
-      priority: document.getElementById('edit-priority').value,
-      estimated_cost: parseFloat(document.getElementById('edit-cost').value) || 0
-    })
-    .eq('id', treatmentId);
-
-  if (error) {
-    Swal.fire('Error', error.message, 'error');
-    return;
-  }
-
-  await supabase.from('clinical_audit').insert({
-    business_id: businessId,
-    patient_id: patientId,
-    event_type: 'TREATMENT_EDITED',
-    description: 'Tratamiento editado',
-    payload: { treatmentId }
-  });
-
-  await Swal.fire({ icon: 'success', title: 'Tratamiento actualizado', timer: 1200, showConfirmButton: false });
-  window.location.reload();
-});
-
-// ⚡ HANDLER: EJECUTAR TRATAMIENTO (Evolución + Actualización Visual)
+// ⚡ HANDLER: EJECUTAR TRATAMIENTO (CORREGIDO Y ROBUSTO)
 document.addEventListener('click', async (e) => {
     const btn = e.target.closest('.execute-treatment-btn');
     if (!btn) return;
 
-    const { id, tooth, treatment } = btn.dataset;
+    // 1. CAPTURAR DIAGNÓSTICO TAMBIÉN
+    const { id, tooth, treatment, diagnosis } = btn.dataset;
 
-    // 1. Preparamos lista de doctores para el select
     let dentistOptions = '';
     dentists.forEach(d => dentistOptions += `<option value="${d.id}">${d.name}</option>`);
 
@@ -1566,7 +1460,9 @@ document.addEventListener('click', async (e) => {
         html: `
             <div class="text-left space-y-3">
                 <div class="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                    🦷 Diente <b>${tooth}</b>: ${treatment}
+                    🦷 Diente <b>${tooth}</b><br>
+                    <span class="text-gray-500 text-xs">Tx: ${treatment}</span><br>
+                    <span class="text-gray-500 text-xs text-amber-700">Dx: ${diagnosis || 'Sin diagnóstico'}</span>
                 </div>
 
                 <div>
@@ -1579,13 +1475,13 @@ document.addEventListener('click', async (e) => {
                 <div>
                     <label class="text-xs font-bold text-gray-500 uppercase">Nota de Evolución *</label>
                     <textarea id="evo-note" class="swal2-textarea m-0 w-full h-24 text-sm" 
-                    placeholder="Ej: Se realiza procedimiento sin complicaciones. Anestesia..."></textarea>
+                    placeholder="Ej: Procedimiento realizado exitosamente. Se cementa..."></textarea>
                 </div>
 
                 <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" id="auto-update-map" checked class="w-4 h-4 text-brand-600 rounded">
                     <label for="auto-update-map" class="text-sm text-gray-700 font-medium">
-                        Actualizar mapa dental (Caries ➝ Resina)
+                        Actualizar mapa dental visualmente
                     </label>
                 </div>
             </div>
@@ -1610,58 +1506,62 @@ document.addEventListener('click', async (e) => {
         Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
 
         try {
-            // A. MARCAR PLAN COMO COMPLETADO
+            // A. UPDATE PLAN
             const { error: planError } = await supabase.from('treatment_plans')
-                .update({ 
-                    status: 'completed', 
-                    completed_at: new Date().toISOString() 
-                })
+                .update({ status: 'completed', completed_at: new Date().toISOString() })
                 .eq('id', id);
             
             if (planError) throw planError;
 
-            // B. CREAR NOTA DE EVOLUCIÓN
+            // B. INSERT NOTE
             const { error: noteError } = await supabase.from('clinical_records').insert({
                 business_id: businessId,
                 patient_id: patientId,
-                dentist_id: formValues.dentist, // El doctor seleccionado
+                dentist_id: formValues.dentist,
                 record_type: 'Evolución',
-                description: `REALIZADO (Diente ${tooth}): ${treatment}.\n\n📝 NOTA CLÍNICA:\n${formValues.note}`
+                description: `REALIZADO (${tooth}): ${treatment}.\nDx Original: ${diagnosis}\n📝 NOTA: ${formValues.note}`
             });
 
             if (noteError) throw noteError;
 
-            // C. 🔥 ACTUALIZAR ODONTOGRAMA "VIVO" (Lógica Smart Mejorada)
+            // C. 🔥 ACTUALIZAR ODONTOGRAMA "VIVO" (Lógica Smart Corregida)
             if (formValues.autoUpdate) {
                 let hasChanges = false;
                 const treatLower = treatment.toLowerCase();
 
                 // 1. Caso IMPLANTE (Corrige la "X" de Ausente)
                 if (treatLower.includes('implante')) {
-                    // Si estaba marcado como ausente, lo quitamos
                     if (mouthState[`${tooth}_center`] === 'ausente') {
                         delete mouthState[`${tooth}_center`]; 
                     }
-                    // Y aplicamos el estado de implante (Tornillo visual)
                     mouthState[`${tooth}_center`] = 'implante';
                     hasChanges = true;
                 }
+                
                 // 2. Caso EXTRACCIÓN (Poner Ausente)
                 else if (treatLower.includes('extracc') || treatLower.includes('exodoncia')) {
                     ['top','bottom','left','right','center'].forEach(p => delete mouthState[`${tooth}_${p}`]);
                     mouthState[`${tooth}_center`] = 'ausente';
                     hasChanges = true;
                 }
-                // 3. Caso CORONA
-                else if (treatLower.includes('corona')) {
-                    mouthState[`${tooth}_center`] = 'corona';
+                
+                // 3. Caso CORONA (CORREGIDO)
+                // Busca 'corona', 'prótesis', 'funda'
+                else if (treatLower.includes('corona') || treatLower.includes('prótesis') || treatLower.includes('protesis') || treatLower.includes('funda')) {
+                    // Limpieza explícita por si tenía el estado de diagnóstico
+                    if (mouthState[`${tooth}_center`] === 'corona') {
+                        delete mouthState[`${tooth}_center`];
+                    }
+                    mouthState[`${tooth}_center`] = 'corona_ok'; // 🔥 ESTO PONE EL RELLENO
                     hasChanges = true;
                 }
-                // 4. Caso ENDODONCIA
+                
+                // 4. Caso ENDODONCIA (CORREGIDO)
                 else if (treatLower.includes('endodoncia') || treatLower.includes('conducto')) {
                     mouthState[`${tooth}_center`] = 'endodoncia';
                     hasChanges = true;
                 }
+                
                 // 5. Caso RESINA / OBTURACIÓN
                 else if (treatLower.includes('resina') || treatLower.includes('calza') || treatLower.includes('obturaci')) {
                     ['top','bottom','left','right','center'].forEach(part => {
@@ -1671,7 +1571,6 @@ document.addEventListener('click', async (e) => {
                             hasChanges = true;
                         }
                     });
-                    // Fallback si no había caries marcada
                     if (!hasChanges) {
                         mouthState[`${tooth}_center`] = 'resina';
                         hasChanges = true;
@@ -1690,7 +1589,8 @@ document.addEventListener('click', async (e) => {
                     });
                 }
             }
-            await Swal.fire('Éxito', 'Tratamiento completado y registrado', 'success');
+
+            await Swal.fire('Éxito', 'Procedimiento registrado', 'success');
             window.location.reload();
 
         } catch (error: any) {
@@ -1699,7 +1599,6 @@ document.addEventListener('click', async (e) => {
         }
     }
 });
-
 
 
  // 🎯 CREAR TRATAMIENTO MANUAL (Para procedimientos visuales y NO visuales)
@@ -1985,6 +1884,7 @@ document.getElementById('create-treatment-plan-btn')?.addEventListener('click', 
           const centerState = state[`${num}_center`]; 
           if(centerState === 'ausente') layers += `<g fill="#1f2937" opacity="0.8"><polygon points="${TOOTH_GEO.absent1}"/><polygon points="${TOOTH_GEO.absent2}"/></g>`;
           if(centerState === 'corona') layers += `<circle cx="30" cy="30" r="18" fill="none" stroke="#eab308" stroke-width="3"/>`;
+          if(centerState === 'corona_ok') layers += `<circle cx="30" cy="30" r="18" fill="#eab308" fill-opacity="0.5" stroke="#eab308" stroke-width="3"/>`; // Relleno
           if(centerState === 'endodoncia') layers += `<circle cx="30" cy="30" r="10" fill="none" stroke="#a855f7" stroke-width="3"/>`;
           if(centerState === 'implante') layers += `<polygon points="${TOOTH_GEO.implant}" fill="none" stroke="#475569" stroke-width="2"/>`;
 
@@ -2506,31 +2406,167 @@ document.getElementById('view-history-btn')?.addEventListener('click', async () 
   });
 
   
-// 🧬 FUNCIÓN DE SEGURIDAD: RESTAURAR DESDE BD (Cliente)
+
+// 🧬 FUNCIÓN DE SEGURIDAD: RESTAURAR DESDE BD (Versión Unificada)
 async function loadLastOdontogram() {
   if (!patientId) return;
 
-  // Consultamos el último registro tipo 'odontogram'
-  const { data, error } = await supabase
-    .from('clinical_records')
-    .select('data')
-    .eq('patient_id', patientId)
-    .eq('record_type', 'odontogram')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle(); // Usamos maybeSingle para que no de error si es el primer paciente sin historia
+  // 1. Consultar ambas fuentes de verdad en PARALELO para velocidad
+  const [clinicalRes, legalRes] = await Promise.all([
+      supabase
+        .from('clinical_records')
+        .select('data, created_at')
+        .eq('patient_id', patientId)
+        .eq('record_type', 'odontogram')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      
+      supabase
+        .from('odontogram_versions')
+        .select('snapshot, created_at')
+        .eq('patient_id', patientId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+  ]);
 
-  // Si encontramos datos, sobreescribimos el estado inicial
-  if (!error && data?.data) {
-    console.log("🔄 Odontograma sincronizado desde historial reciente");
-    mouthState = data.data; // Actualizamos la variable global
-    
-    // Forzamos el repintado
-    updateVisuals();
-    detectProblems();
+  const lastClinical = clinicalRes.data;
+  const lastLegal = legalRes.data;
+
+  // 2. Obtener fechas (o 0 si es null)
+  const clinicalTime = lastClinical?.created_at ? new Date(lastClinical.created_at).getTime() : 0;
+  const legalTime = lastLegal?.created_at ? new Date(lastLegal.created_at).getTime() : 0;
+
+  // 3. Determinar el ganador (El más reciente)
+  if (clinicalTime === 0 && legalTime === 0) {
+      console.log("🆕 Paciente nuevo: Odontograma en blanco");
+      mouthState = {}; // Iniciar limpio
+      return;
   }
+
+  if (clinicalTime >= legalTime) {
+      console.log("📝 Cargando último estado manual (Clinical Record)");
+      mouthState = lastClinical.data || {};
+  } else {
+      console.log("🛡️ Cargando último estado legal (Plan Aprobado)");
+      mouthState = lastLegal.snapshot || {};
+  }
+
+  // 4. Aplicar cambios
+  updateVisuals();
+  detectProblems();
 }
 
+// ✏️ HANDLER: EDITAR TRATAMIENTO (Borrador)
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.edit-treatment-btn');
+    if (!btn) return;
+
+    // 1. Validación de seguridad
+    if (clinicalEngineState.hasApprovedPlan) {
+        Swal.fire('Plan Bloqueado', 'No se pueden editar tratamientos de un plan ya aprobado.', 'warning');
+        return;
+    }
+
+    const treatmentId = btn.dataset.id;
+    Swal.fire({ title: 'Cargando...', didOpen: () => Swal.showLoading() });
+
+    try {
+        // 2. Obtener datos actuales del tratamiento
+        const { data: treatment, error } = await supabase
+            .from('treatment_plans')
+            .select('*')
+            .eq('id', treatmentId)
+            .single();
+
+        if (error || !treatment) throw new Error('No se encontró el tratamiento');
+
+        // 3. Mostrar Modal de Edición
+        const { value: formValues } = await Swal.fire({
+            title: '✏️ Editar Tratamiento',
+            html: `
+                <div class="grid gap-3 text-left">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Diente</label>
+                            <input id="edit-tooth" value="${treatment.tooth_number || ''}" class="swal2-input m-0 w-full text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Prioridad</label>
+                            <select id="edit-priority" class="swal2-input m-0 w-full text-sm">
+                                <option value="normal" ${treatment.priority === 'normal' ? 'selected' : ''}>🟡 Normal</option>
+                                <option value="urgent" ${treatment.priority === 'urgent' ? 'selected' : ''}>🔴 Urgente</option>
+                                <option value="cosmetic" ${treatment.priority === 'cosmetic' ? 'selected' : ''}>🟣 Estético</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">Tratamiento</label>
+                        <input id="edit-type" value="${treatment.treatment_type}" class="swal2-input m-0 w-full text-sm">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">Diagnóstico</label>
+                        <input id="edit-diagnosis" value="${treatment.diagnosis}" class="swal2-input m-0 w-full text-sm">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase">Costo Estimado</label>
+                        <input id="edit-cost" type="number" value="${treatment.estimated_cost}" class="swal2-input m-0 w-full text-sm font-bold text-gray-700">
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar Cambios',
+            confirmButtonColor: 'rgb(var(--color-brand))',
+            preConfirm: () => {
+                return {
+                    tooth_number: document.getElementById('edit-tooth').value,
+                    treatment_type: document.getElementById('edit-type').value,
+                    diagnosis: document.getElementById('edit-diagnosis').value,
+                    priority: document.getElementById('edit-priority').value,
+                    estimated_cost: document.getElementById('edit-cost').value
+                };
+            }
+        });
+
+        // 4. Guardar Cambios
+        if (formValues) {
+            Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
+
+            const { error: updateError } = await supabase
+                .from('treatment_plans')
+                .update({
+                    tooth_number: formValues.tooth_number,
+                    treatment_type: formValues.treatment_type,
+                    diagnosis: formValues.diagnosis,
+                    priority: formValues.priority,
+                    estimated_cost: parseFloat(formValues.estimated_cost) || 0
+                })
+                .eq('id', treatmentId);
+
+            if (updateError) throw updateError;
+
+            // Auditoría (Opcional)
+            await supabase.from('clinical_audit').insert({
+                business_id: businessId,
+                patient_id: patientId,
+                event_type: 'TREATMENT_EDITED',
+                description: `Edición manual de tratamiento (Diente ${formValues.tooth_number})`,
+                payload: { previous: treatment, new: formValues }
+            });
+
+            await Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1000, showConfirmButton: false });
+            window.location.reload();
+        }
+
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'No se pudo cargar o actualizar el tratamiento', 'error');
+    }
+});
 
 // ==========================================
 // 🚀 BOOTSTRAPPER / CICLO DE VIDA CENTRAL
@@ -2583,43 +2619,33 @@ if (document.readyState === 'loading') {
      ODONTOGRAMA PREMIUM STYLES
      ========================================== */
   
+  /* Contenedor Responsive con Scroll Suave */
   #odontogram-canvas {
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 20px 10px;
+    padding: 20px; /* Unificado */
     background-color: #f8fafc;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
+    
+    /* Scrollbar Styling */
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 #f1f5f9;
   }
-#odontogram-canvas {
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 20px;
-  background-color: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-/* 🔥 CLAVE UX */
-.odontogram-inner {
-  display: flex;
-  justify-content: center; /* Centra visualmente */
-  min-width: fit-content;
-}
-
-/* SVG nunca se estira */
-.odontogram-inner svg {
-  flex-shrink: 0;
-}
-
-  
   
   #odontogram-canvas::-webkit-scrollbar { height: 8px; }
   #odontogram-canvas::-webkit-scrollbar-track { background: #f1f5f9; }
   #odontogram-canvas::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-  
+
+  /* 🔥 CLAVE UX: Centrado y scroll */
+  .odontogram-inner {
+    display: flex;
+    justify-content: center;
+    min-width: fit-content;
+  }
+  .odontogram-inner svg {
+    flex-shrink: 0;
+  }
 
   /* Grupo Diente */
   .tooth-group { cursor: pointer; transition: transform 0.1s; }
@@ -2636,7 +2662,7 @@ if (document.readyState === 'loading') {
 
   /* Superficies (El Diente Base) */
   .tooth-surface {
-    fill: #ffffff; /* Blanco base */
+    fill: #ffffff;
     stroke: #94a3b8;
     stroke-width: 1px;
     transition: all 0.2s ease;
@@ -2648,25 +2674,62 @@ if (document.readyState === 'loading') {
   .state-resina { fill: #3b82f6 !important; stroke: #1d4ed8 !important; }
   .state-sellante { fill: #22c55e !important; stroke: #15803d !important; }
   
-  /* Capas / Overlays (Estructurales) */
+  /* ==========================================
+     CAPAS ESTRUCTURALES (LOGICA CORRECTA)
+     ========================================== */
+
+  /* Estilos Base para todas las capas */
+  .layer-ausente, .layer-corona, .layer-endo, .layer-implante {
+    opacity: 0; /* Invisibles por defecto */
+    pointer-events: none;
+    transition: all 0.3s ease;
+  }
+
+  /* CORONA (Overlay Círculo) */
   .layer-corona {
-    transition: opacity 0.3s;
-    /* Colores definidos inline en el JS para asegurar visibilidad */
+    fill: none; /* Por defecto vacía (Diagnóstico) */
+    stroke: #eab308; /* Gold */
+    stroke-width: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
   }
   
+  /* Estado: Diagnóstico (Círculo Vacío) */
+  .has-corona .layer-corona { 
+      opacity: 1; 
+  }
+  
+  /* 🔥 ESTADO: REALIZADO (Círculo Relleno) - CORREGIDO */
+  .has-corona-ok .layer-corona { 
+      opacity: 1; 
+      /* EL CAMBIO: !important es obligatorio para sobreescribir el SVG */
+      fill: #eab308 !important; 
+      fill-opacity: 0.5; 
+  }
+
+  /* 2. ENDODONCIA */
   .layer-endo {
-    transition: opacity 0.3s;
+    fill: none;
+    stroke: #a855f7;
+    stroke-width: 3px;
   }
+  .has-endodoncia .layer-endo { opacity: 1; }
 
+  /* 3. AUSENTE */
   .layer-ausente {
-    transition: opacity 0.3s;
+    fill: #1f2937;
   }
-  /* Cuando está ausente, el diente de fondo se atenúa */
-  .has-ausente .tooth-surface { opacity: 0.1; } 
+  .has-ausente .layer-ausente { opacity: 0.8; }
+  .has-ausente .tooth-surface { opacity: 0.1; } /* Atenuar diente fondo */
 
+  /* 4. IMPLANTE */
   .layer-implante {
-    transition: opacity 0.3s;
+    fill: none;
+    stroke: #475569;
+    stroke-width: 2px;
   }
+  .has-implante .layer-implante { opacity: 1; }
 
   /* Utilidades */
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
@@ -2676,11 +2739,11 @@ if (document.readyState === 'loading') {
   .swal-opt:hover { background-color: #f3f4f6; }
 
   /* Bloqueo visual cuando el plan está aprobado */
-body.plan-locked .tooth-group {
-    cursor: not-allowed !important;
-    opacity: 0.8;
-}
-body.plan-locked #save-odontogram-btn {
-    display: none; /* Ocultar botón guardar si está bloqueado */
-}
+  body.plan-locked .tooth-group {
+      cursor: not-allowed !important;
+      opacity: 0.8;
+  }
+  body.plan-locked #save-odontogram-btn {
+      display: none;
+  }
 </style>
