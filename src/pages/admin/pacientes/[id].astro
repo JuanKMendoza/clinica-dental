@@ -1,6 +1,8 @@
 ---
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 import { supabase } from "../../../lib/supabase";
+import PaymentsPanel from "../../../components/patient/PaymentsPanel.astro";
+import { formatCOP } from "../../../utils/money";
 
 const { id } = Astro.params;
 
@@ -40,6 +42,12 @@ const urgentCount = pendingTreatments.filter(t => t.priority === 'urgent').lengt
 const { data: servicesList } = await supabase.from("services").select("id, name, price").eq("business_id", patient.business_id).eq("is_active", true).order("name");
 const { data: dentistsList } = await supabase.from("dentists").select("id, name").eq("business_id", patient.business_id).eq("is_active", true).order("name");
 
+const { data: payments } = await supabase
+    .from("payments")
+    .select("*")
+    .eq("patient_id", id)
+    .order("created_at", { ascending: false });
+
 // Helpers
 const getInitials = (name: string) => name ? name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase() : "??";
 const calculateAge = (birthDateString: string) => {
@@ -53,9 +61,6 @@ const calculateAge = (birthDateString: string) => {
 };
 const age = calculateAge(patient.birth_date);
 
-// utils/money.ts
-export const formatCOP = (value: number | string) =>
-  `$${Number(value || 0).toLocaleString('es-CO')}`;
 
 ---
 
@@ -121,6 +126,12 @@ export const formatCOP = (value: number | string) =>
                     </button>
                     <button class="tab-btn flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-files">
                         <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg></div> Archivos
+                    </button>
+                    <button class="tab-btn flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all text-left w-full min-w-[150px] lg:min-w-0" data-target="tab-payments">
+                        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div> 
+                        Pagos y Saldo
                     </button>
                 </nav>
             </div>
@@ -466,6 +477,18 @@ export const formatCOP = (value: number | string) =>
                         ) : null}
                     </div>
                 </div>
+            </div>
+
+            <div id="tab-payments" class="tab-content hidden">
+                <PaymentsPanel 
+                    patientId={id} 
+                    businessId={patient.business_id} 
+                    payments={payments || []}
+                    treatmentPlans={treatmentPlans || []}
+                    brandColor={businessData?.primary_color || "#059669"}
+                    patient={patient} 
+                    businessData={businessData}
+                />
             </div>
 
         </div>
