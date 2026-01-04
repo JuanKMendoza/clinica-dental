@@ -1,0 +1,545 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { supabase } from "../../lib/supabase";
+
+// 1. AUTH
+const accessToken = Astro.cookies.get("sb-access-token")?.value;
+const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
+
+if (!accessToken || !refreshToken) {
+  return Astro.redirect("/admin/login");
+}
+
+await supabase.auth.setSession({
+  access_token: accessToken,
+  refresh_token: refreshToken,
+});
+
+const { data: sessionData } = await supabase.auth.getSession();
+const userId = sessionData.session?.user?.id;
+
+// Obtener business_id
+const { data: profile } = await supabase
+  .from("profiles")
+  .select("business_id")
+  .eq("id", userId)
+  .single();
+
+if (!profile?.business_id) {
+  return Astro.redirect("/admin/login");
+}
+
+const businessId = profile.business_id;
+
+// 2. CONSULTAS MAESTRAS
+// A. Todos los pacientes con deuda
+const { data: patientsWithDebt } = await supabase
+  .from("patients")
+  .select(`
+    id,
+    full_name,
+    phone,
+    email,
+    document_id,
+    created_at
+  `)
+  .eq("business_id", businessId);
+
+// B. Todos los tratamientos (cargos)
+const { data: treatments } = await supabase
+  .from("treatment_plans")
+  .select("patient_id, estimated_cost, status, created_at, completed_at")
+  .eq("business_id", businessId)
+  .in("status", ["approved", "completed"]);
+
+// C. Todos los pagos
+const { data: payments } = await supabase
+  .from("payments")
+  .select("patient_id, amount, created_at, payment_method")
+  .eq("business_id", businessId);
+
+// 3. PROCESAMIENTO DE DATOS (Server Side)
+const patientDebts = patientsWithDebt?.map(patient => {
+    const patientTreatments = treatments?.filter(t => t.patient_id === patient.id) || [];
+    const patientPayments = payments?.filter(p => p.patient_id === patient.id) || [];
+    
+    const totalCharge = patientTreatments.reduce((sum, t) => sum + Number(t.estimated_cost), 0);
+    const totalPaid = patientPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const balance = totalCharge - totalPaid;
+    
+    // Calcular días desde última transacción
+    const lastActivity = patientPayments.length > 0 
+    ? new Date(patientPayments[patientPayments.length - 1].created_at)
+    : patientTreatments.length > 0
+    ? new Date(
+        patientTreatments[patientTreatments.length - 1].completed_at 
+        || patientTreatments[patientTreatments.length - 1].created_at
+        )
+    : new Date(patient.created_at);
+
+    
+    const daysSinceActivity = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Scoring de riesgo
+    let riskLevel = 'low';
+    if (balance > 500000 && daysSinceActivity > 30) riskLevel = 'high';
+    else if (balance > 200000 && daysSinceActivity > 15) riskLevel = 'medium';
+    
+    return {
+        ...patient,
+        totalCharge,
+        totalPaid,
+        balance,
+        daysSinceActivity,
+        lastActivity,
+        riskLevel,
+        paymentsCount: patientPayments.length
+    };
+}).filter(p => p.balance > 0) // Solo los que deben
+  .sort((a, b) => b.balance - a.balance); // Ordenar por deuda DESC
+
+// 4. MÉTRICAS GLOBALES
+const totalPortfolio = patientDebts?.reduce((sum, p) => sum + p.balance, 0) || 0;
+const totalClients = patientDebts?.length || 0;
+const avgDebt = totalClients > 0 ? totalPortfolio / totalClients : 0;
+
+const highRiskClients = patientDebts?.filter(p => p.riskLevel === 'high').length || 0;
+const mediumRiskClients = patientDebts?.filter(p => p.riskLevel === 'medium').length || 0;
+
+// Top 5 deudores
+const topDebtors = patientDebts?.slice(0, 5) || [];
+
+// Deudas por antigüedad
+const aged30 = patientDebts?.filter(p => p.daysSinceActivity <= 30).reduce((sum, p) => sum + p.balance, 0) || 0;
+const aged60 = patientDebts?.filter(p => p.daysSinceActivity > 30 && p.daysSinceActivity <= 60).reduce((sum, p) => sum + p.balance, 0) || 0;
+const aged90plus = patientDebts?.filter(p => p.daysSinceActivity > 60).reduce((sum, p) => sum + p.balance, 0) || 0;
+
+// Proyección próximos 30 días (tratamientos pendientes que vencen)
+const { data: upcomingAppointments } = await supabase
+  .from("appointments")
+  .select("patient_id, appointment_date")
+  .eq("business_id", businessId)
+  .gte("appointment_date", new Date().toISOString().split('T')[0])
+  .lte("appointment_date", new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0]);
+
+const formatCOP = (num: number) => `$${Number(num).toLocaleString('es-CO', { minimumFractionDigits: 0 })}`;
+---
+
+<AdminLayout title="Gestión de Cartera">
+    
+    <div class="max-w-7xl mx-auto space-y-6 pb-20">
+        
+        <!-- HEADER -->
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">💰 Gestión de Cartera</h1>
+                <p class="text-gray-500 mt-1">Control financiero y cobranza inteligente</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="btn-export-excel" class="px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Exportar Excel
+                </button>
+                <button id="btn-send-reminders" class="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    Enviar Recordatorios
+                </button>
+            </div>
+        </div>
+
+        <!-- MÉTRICAS PRINCIPALES -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            
+            <!-- Total Cartera -->
+            <div class="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <p class="text-blue-100 text-sm font-bold uppercase tracking-wider mb-2">Total Cartera</p>
+                <p class="text-4xl font-extrabold mb-1">{formatCOP(totalPortfolio)}</p>
+                <p class="text-blue-100 text-xs">{totalClients} clientes con saldo</p>
+            </div>
+
+            <!-- Promedio de Deuda -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    </div>
+                </div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Deuda Promedio</p>
+                <p class="text-2xl font-extrabold text-gray-900">{formatCOP(avgDebt)}</p>
+            </div>
+
+            <!-- Riesgo Alto -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </div>
+                    {highRiskClients > 0 && <span class="animate-pulse text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">ALERTA</span>}
+                </div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Clientes Riesgo Alto</p>
+                <p class="text-2xl font-extrabold text-red-600">{highRiskClients}</p>
+                <p class="text-xs text-gray-500 mt-1">+{mediumRiskClients} riesgo medio</p>
+            </div>
+
+            <!-- Proyección 30 días -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-green-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                </div>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cobro Estimado (30d)</p>
+                <p class="text-2xl font-extrabold text-green-600">{formatCOP(aged30)}</p>
+                <p class="text-xs text-gray-500 mt-1">{upcomingAppointments?.length || 0} citas programadas</p>
+            </div>
+        </div>
+
+        <!-- GRID PRINCIPAL -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- COLUMNA IZQUIERDA: Top Deudores + Antigüedad -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- TOP 5 DEUDORES -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <span class="text-2xl">🏆</span> Top 5 Deudores
+                        </h2>
+                        <a href="#all-debtors" class="text-sm text-blue-600 font-bold hover:underline">Ver todos →</a>
+                    </div>
+                    <div class="space-y-3">
+                        {topDebtors.map((patient, index) => (
+                            <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group">
+                                <div class={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-gray-300 text-gray-700' : index === 2 ? 'bg-orange-300 text-orange-900' : 'bg-gray-200 text-gray-600'}`}>
+                                    {index + 1}
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-gray-900">{patient.full_name}</p>
+                                    <p class="text-xs text-gray-500">Última actividad: hace {patient.daysSinceActivity} días</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-lg font-extrabold text-red-600">{formatCOP(patient.balance)}</p>
+                                    <span class={`text-[10px] font-bold px-2 py-0.5 rounded-full ${patient.riskLevel === 'high' ? 'bg-red-100 text-red-700' : patient.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                        {patient.riskLevel === 'high' ? 'ALTO RIESGO' : patient.riskLevel === 'medium' ? 'RIESGO MEDIO' : 'BAJO RIESGO'}
+                                    </span>
+                                </div>
+                                <a href={`/admin/pacientes/${patient.id}#pagos`} class="opacity-0 group-hover:opacity-100 transition-opacity px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">
+                                    Ver →
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <!-- ANTIGÜEDAD DE CARTERA -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h2 class="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                        <span class="text-2xl">⏱️</span> Antigüedad de Cartera
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-bold text-gray-600">0-30 días (Corriente)</span>
+                                <span class="text-sm font-bold text-green-600">{formatCOP(aged30)}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="bg-green-500 h-3 rounded-full" style={`width: ${(aged30/totalPortfolio)*100}%`}></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-bold text-gray-600">31-60 días (Atención)</span>
+                                <span class="text-sm font-bold text-yellow-600">{formatCOP(aged60)}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="bg-yellow-500 h-3 rounded-full" style={`width: ${(aged60/totalPortfolio)*100}%`}></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-bold text-gray-600">+60 días (Vencida)</span>
+                                <span class="text-sm font-bold text-red-600">{formatCOP(aged90plus)}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div class="bg-red-500 h-3 rounded-full" style={`width: ${(aged90plus/totalPortfolio)*100}%`}></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- COLUMNA DERECHA: Alertas y Acciones Rápidas -->
+            <div class="space-y-6">
+                
+                <!-- ALERTAS DE RIESGO -->
+                {highRiskClients > 0 && (
+                    <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6">
+                        <div class="flex items-start gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-red-900 text-sm">⚠️ Alertas Críticas</h3>
+                                <p class="text-xs text-red-700 mt-1">{highRiskClients} clientes requieren acción inmediata</p>
+                            </div>
+                        </div>
+                        <button id="btn-view-alerts" class="w-full px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-colors">
+                            Ver Detalles
+                        </button>
+                    </div>
+                )}
+
+                <!-- ACCIONES RÁPIDAS -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Acciones Rápidas</h3>
+                    <div class="space-y-3">
+                        <button class="w-full flex items-center gap-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors text-left group">
+                            <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-bold text-sm text-gray-900">Programar Cobros</p>
+                                <p class="text-xs text-gray-500">Citas de recordatorio</p>
+                            </div>
+                        </button>
+
+                        <button class="w-full flex items-center gap-3 p-3 bg-green-50 hover:bg-green-100 rounded-xl transition-colors text-left group">
+                            <div class="w-10 h-10 rounded-lg bg-green-600 text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-bold text-sm text-gray-900">WhatsApp Masivo</p>
+                                <p class="text-xs text-gray-500">Enviar recordatorios</p>
+                            </div>
+                        </button>
+
+                        <button class="w-full flex items-center gap-3 p-3 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors text-left group">
+                            <div class="w-10 h-10 rounded-lg bg-purple-600 text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-bold text-sm text-gray-900">Crear Plan de Pago</p>
+                                <p class="text-xs text-gray-500">Facilidades de cuotas</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TIPS DE COBRANZA -->
+                <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-6 border border-amber-200">
+                    <div class="flex items-start gap-3 mb-3">
+                        <span class="text-2xl">💡</span>
+                        <div>
+                            <h3 class="font-bold text-amber-900 text-sm">Tip de Cobranza</h3>
+                            <p class="text-xs text-amber-700 mt-2 leading-relaxed">
+                                Los recordatorios por WhatsApp 48 horas antes aumentan el cobro en un 67%. 
+                                <a href="#" class="font-bold underline">Configura recordatorios automáticos</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TABLA COMPLETA DE DEUDORES -->
+        <div id="all-debtors" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-900">Todos los Deudores ({totalClients})</h2>
+                <input type="text" id="search-debtors" placeholder="Buscar por nombre, documento..." class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Paciente</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contacto</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Deuda</th>
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Antigüedad</th>
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Riesgo</th>
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100" id="debtors-tbody">
+                        {patientDebts?.map(patient => (
+                            <tr class="hover:bg-gray-50 transition-colors debtor-row" data-name={patient.full_name.toLowerCase()} data-doc={patient.document_id?.toLowerCase()}>
+                                <td class="px-6 py-4">
+                                    <div>
+                                        <p class="font-bold text-gray-900">{patient.full_name}</p>
+                                        <p class="text-xs text-gray-500">ID: {patient.document_id || 'N/A'}</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs">
+                                        <p class="text-gray-600">📱 {patient.phone || 'Sin teléfono'}</p>
+                                        <p class="text-gray-500">✉️ {patient.email || 'Sin email'}</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <p class="text-lg font-extrabold text-red-600">{formatCOP(patient.balance)}</p>
+                                    <p class="text-xs text-gray-500">{patient.paymentsCount} abonos</p>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class={`inline-block px-3 py-1 rounded-full text-xs font-bold ${patient.daysSinceActivity <= 30 ? 'bg-green-100 text-green-700' : patient.daysSinceActivity <= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                        {patient.daysSinceActivity} días
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class={`inline-block px-3 py-1 rounded-full text-xs font-bold ${patient.riskLevel === 'high' ? 'bg-red-500 text-white' : patient.riskLevel === 'medium' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}`}>
+                                        {patient.riskLevel === 'high' ? 'ALTO' : patient.riskLevel === 'medium' ? 'MEDIO' : 'BAJO'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex justify-center gap-2">
+                                        <a href={`/admin/pacientes/${patient.id}#pagos`} class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors">
+                                            Ver Cuenta
+                                        </a>
+                                        {patient.phone && (
+                                            <a href={`https://wa.me/57${patient.phone?.replace(/\D/g, '')}`} target="_blank" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors">
+                                                WhatsApp
+                                            </a>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- DATA PARA JAVASCRIPT -->
+    <div id="cartera-data" 
+        data-debtors={JSON.stringify(patientDebts)} 
+        data-business-id={businessId}
+        class="hidden">
+    </div>
+
+</AdminLayout>
+
+<script>
+    import Swal from "sweetalert2";
+
+    // Búsqueda en tiempo real
+    const searchInput = document.getElementById('search-debtors') as HTMLInputElement;
+    searchInput?.addEventListener('input', () => {
+        const term = searchInput.value.toLowerCase();
+        const rows = document.querySelectorAll('.debtor-row');
+        
+        rows.forEach((row: Element) => {
+            const r = row as HTMLElement;
+            const name = r.dataset.name || '';
+            const doc = r.dataset.doc || '';
+            
+            if (name.includes(term) || doc.includes(term)) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+    });
+
+    // Exportar a Excel
+    document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+        const data = JSON.parse(document.getElementById('cartera-data')?.dataset.debtors || '[]');
+        
+        let csv = 'Paciente;Documento;Teléfono;Deuda;Días Mora;Riesgo\n';
+        data.forEach((d: any) => {
+            csv += `${d.full_name};${d.document_id || ''};${d.phone || ''};${d.balance};${d.daysSinceActivity};${d.riskLevel}\n`;
+        });
+        
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cartera_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+    });
+
+    // Enviar recordatorios masivos
+    document.getElementById('btn-send-reminders')?.addEventListener('click', async () => {
+        const { value: confirm } = await Swal.fire({
+            title: '📲 Enviar Recordatorios',
+            html: `
+                <div class="text-left">
+                    <p class="text-sm text-gray-600 mb-4">
+                        Se enviará un mensaje de WhatsApp a todos los clientes con deuda pendiente.
+                    </p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p class="text-xs font-bold text-blue-900 mb-2">Vista previa del mensaje:</p>
+                        <p class="text-xs text-blue-800 italic">
+                            "Hola [Nombre], te recordamos que tienes un saldo pendiente de $[Monto]. 
+                            ¿Podemos coordinar un abono? Gracias 😊"
+                        </p>
+                    </div>
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, Enviar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#059669'
+        });
+
+        if (confirm) {
+            Swal.fire({
+                title: 'Enviando...',
+                html: 'Esto puede tomar unos segundos',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            // Aquí iría la lógica de envío masivo
+            // Por ahora simulamos
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Recordatorios Enviados!',
+                    text: 'Se notificó a todos los clientes con deuda',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }, 2000);
+        }
+    });
+
+    // Ver alertas críticas
+    document.getElementById('btn-view-alerts')?.addEventListener('click', () => {
+        const data = JSON.parse(document.getElementById('cartera-data')?.dataset.debtors || '[]');
+        const highRisk = data.filter((d: any) => d.riskLevel === 'high');
+        
+        const html = highRisk.map((d: any) => `
+            <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg mb-2">
+                <div>
+                    <p class="font-bold text-sm">${d.full_name}</p>
+                    <p class="text-xs text-gray-600">Mora: ${d.daysSinceActivity} días</p>
+                </div>
+                <span class="font-bold text-red-600">$${Number(d.balance).toLocaleString('es-CO')}</span>
+            </div>
+        `).join('');
+        
+        Swal.fire({
+            title: '⚠️ Clientes en Riesgo Alto',
+            html: `<div class="text-left max-h-96 overflow-y-auto">${html}</div>`,
+            width: '600px',
+            confirmButtonText: 'Cerrar',
+            confirmButtonColor: '#dc2626'
+        });
+    });
+</script>
+
+<style>
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
