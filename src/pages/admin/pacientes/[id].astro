@@ -262,6 +262,11 @@ const age = calculateAge(patient.birth_date);
                             class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold shadow">
                             🧬 Versiones del Plan
                             </button>
+                            <!-- 🔥 NUEVO: Botón de Impresión -->
+                            <button id="btn-print-odontogram" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm shadow-md hover:bg-slate-800 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                Imprimir / PDF
+                            </button>
                         </div>
                     </div>
 
@@ -2588,6 +2593,162 @@ document.addEventListener('click', async (e) => {
     } catch (e) {
         console.error(e);
         Swal.fire('Error', 'No se pudo cargar o actualizar el tratamiento', 'error');
+    }
+});
+
+// 🖨️ HANDLER: IMPRESIÓN LEGAL ODONTOGRAMA
+document.getElementById('btn-print-odontogram')?.addEventListener('click', () => {
+    
+    // 1. Capturar el SVG actual (Tal como se ve en pantalla)
+    const svgElement = document.querySelector('#odontogram-canvas svg');
+    if (!svgElement) return Swal.fire('Error', 'No se encuentra el odontograma', 'error');
+    
+    const svgHtml = svgElement.outerHTML; // Clonamos el gráfico
+    const dateStr = new Date().toLocaleDateString('es-CO');
+
+    // 2. Generar Tabla de Tratamientos para el reporte
+    // Filtramos solo lo relevante para un reporte clínico
+    const treatmentsRows = treatmentPlans
+        .filter((t: any) => t.status !== 'cancelled') // No mostrar cancelados
+        .map((t: any) => `
+            <tr>
+                <td style="padding: 5px; border: 1px solid #ddd;">${t.tooth_number || 'General'}</td>
+                <td style="padding: 5px; border: 1px solid #ddd;">${t.treatment_type}</td>
+                <td style="padding: 5px; border: 1px solid #ddd;">${t.diagnosis}</td>
+                <td style="padding: 5px; border: 1px solid #ddd; text-transform: uppercase; font-size: 10px;">${t.status}</td>
+            </tr>
+        `).join('');
+
+    // 3. Crear Iframe Aislado
+    const iframe = document.createElement('iframe');
+    Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+        doc.open();
+        doc.write(`
+            <html>
+            <head>
+                <title>Odontograma - ${patientInfo.name}</title>
+                <style>
+    /* 1. FORZAR COLORES EN IMPRESIÓN (CRÍTICO) */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    body { font-family: sans-serif; padding: 40px; }
+    h1 { font-size: 20px; margin-bottom: 5px; text-transform: uppercase; }
+    h2 { font-size: 14px; color: #555; margin-top: 0; margin-bottom: 20px; }
+    
+    /* Header Info */
+    .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; font-size: 12px; }
+    
+    /* Odontograma Container */
+    .odonto-container { width: 100%; margin-bottom: 30px; text-align: center; }
+    
+    /* 🔥 ESTILOS CRÍTICOS (CORREGIDO) */
+    .tooth-group { transform-origin: center; }
+    .tooth-label { font-size: 12px; font-weight: bold; fill: #666; }
+    
+    /* ❌ ANTES: .tooth-surface { fill: white; ... } ESTO BLOQUEABA LOS COLORES */
+    /* ✅ AHORA: Quitamos 'fill: white' para que el color venga del atributo del elemento (rojo/azul/blanco) */
+    .tooth-surface { 
+        stroke: #999; 
+        stroke-width: 1px; 
+    }
+    
+    /* Colores de Estado (Respaldo por si usas clases) */
+    .state-caries { fill: #ef4444 !important; stroke: #b91c1c !important; }
+    .state-resina { fill: #3b82f6 !important; stroke: #1d4ed8 !important; }
+    .state-sellante { fill: #22c55e !important; stroke: #15803d !important; }
+    
+    /* Capas */
+    .layer-corona, .layer-endo, .layer-ausente, .layer-implante { opacity: 0; }
+    
+    .has-corona .layer-corona { opacity: 1; fill: none; stroke: #eab308; stroke-width: 3px; }
+    
+    /* 🔥 CORONA RELLENA EN IMPRESIÓN */
+    .has-corona-ok .layer-corona { 
+        opacity: 1; 
+        fill: #eab308 !important; 
+        fill-opacity: 0.5; 
+        stroke: #eab308; 
+        stroke-width: 3px; 
+    }
+    
+    .has-ausente .layer-ausente { opacity: 0.8; fill: #1f2937; }
+    .has-ausente .tooth-surface { opacity: 0.2; }
+    .has-endodoncia .layer-endo { opacity: 1; fill: none; stroke: #a855f7; stroke-width: 2px; }
+    .has-implante .layer-implante { opacity: 1; fill: none; stroke: #555; stroke-width: 2px; }
+
+    /* Tabla */
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #f3f4f6; text-align: left; padding: 5px; border: 1px solid #ccc; }
+    
+    /* Firmas */
+    .signatures { margin-top: 50px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+    .sig-box { width: 40%; border-top: 1px solid #000; padding-top: 5px; text-align: center; font-size: 11px; }
+</style>
+            </head>
+            <body>
+                <div class="header">
+                    <div>
+                        <h1>${branding.name || 'Clínica Dental'}</h1>
+                        <p>${branding.address || ''}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <strong>HISTORIA CLÍNICA</strong><br>
+                        Fecha: ${dateStr}
+                    </div>
+                </div>
+
+                <div class="info-grid">
+                    <div>
+                        <strong>Paciente:</strong> ${patientInfo.name}<br>
+                        <strong>Documento:</strong> ${patientInfo.doc}<br>
+                    </div>
+                    <div>
+                        <strong>Teléfono:</strong> ${patientInfo.phone}<br>
+                        <strong>Email:</strong> ${patientInfo.email}
+                    </div>
+                </div>
+
+                <h3>Odontograma Actual</h3>
+                <div class="odonto-container">
+                    ${svgHtml}
+                </div>
+
+                <h3>Plan de Tratamiento / Evolución</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Diente</th>
+                            <th>Procedimiento</th>
+                            <th>Diagnóstico</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${treatmentsRows}
+                    </tbody>
+                </table>
+
+                <div class="signatures">
+                    <div class="sig-box">Firma del Profesional</div>
+                    <div class="sig-box">Firma del Paciente</div>
+                </div>
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setTimeout(() => document.body.removeChild(iframe), 60000);
+        }, 500);
     }
 });
 

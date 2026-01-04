@@ -164,3 +164,76 @@ Paso siguiente:
 🧬 1️⃣ Congelar odontograma al aprobar plan
 🧬 2️⃣ Guardar versión en nueva tabla
 🧬 3️⃣ Visualizar versiones por fecha
+
+
+02/01/2026
+
+---
+
+# 📚 Documentación Técnica: Módulo Financiero y de Pagos (Fase 5)
+
+**Estado:** Completado (100%)
+**Ubicación Principal:** `src/components/patient/PaymentsPanel.astro` integrando en `src/pages/admin/pacientes/[id].astro`.
+
+## 1. Arquitectura de Base de Datos
+Se implementó una estructura relacional robusta en Supabase para manejar transacciones monetarias.
+
+*   **Tabla:** `public.payments`
+*   **Columnas Clave:**
+    *   `id`: UUID único.
+    *   `amount`: Numeric (Permite positivos para ingresos y negativos para devoluciones).
+    *   `payment_method`: Texto (Efectivo, Transferencia, Tarjeta, QR).
+    *   `reference`: Texto (Nro de comprobante/recibo).
+    *   `notes`: Texto (Observaciones del pago).
+    *   `registered_by`: UUID (Traza de auditoría del usuario que registró).
+*   **Seguridad (RLS):**
+    *   Política unificada `payments_policy_unified`: Aislamiento estricto por `business_id` vinculado al perfil del usuario.
+    *   Restricciones: Se eliminó el `CHECK (amount > 0)` para permitir reembolsos contables (valores negativos).
+
+## 2. Lógica Contable (El "Libro Mayor")
+El sistema no almacena un "saldo final" estático, sino que lo calcula en tiempo real basándose en eventos (Event Sourcing simplificado), garantizando integridad de datos.
+
+*   **Unificación de Transacciones:**
+    *   **Cargos (+):** Provienen de `treatment_plans` con estado `approved` o `completed`. Usan el `estimated_cost` como valor de deuda.
+    *   **Abonos (-):** Provienen de la tabla `payments`.
+*   **Cálculo de Saldo (Running Balance):**
+    *   Se ordenan todos los eventos cronológicamente.
+    *   Se calcula el saldo línea por línea: `Saldo Anterior + Cargo - Abono = Nuevo Saldo`.
+*   **Corte por Fechas (Server-Side):**
+    *   Al filtrar por fecha, el sistema calcula un `initialBalance` sumando todas las transacciones previas a la fecha de inicio seleccionada.
+
+## 3. Funcionalidades del Frontend (UI/UX)
+
+### A. Dashboard Financiero
+*   **KPIs en tiempo real:**
+    *   **Valor Tratamiento:** Suma total de lo aprobado.
+    *   **Total Abonado:** Suma total de ingresos.
+    *   **Saldo Actual:** Indicador visual inteligente (Rojo si hay deuda, Verde si está Paz y Salvo o tiene Saldo a Favor).
+
+### B. Gestión de Pagos
+*   **Registrar Ingreso:** Modal interactivo (SweetAlert2) con validación de montos y selectores de método de pago.
+*   **Reembolsos (Refunds):**
+    *   Botón condicional: Solo aparece si el paciente tiene **Saldo a Favor**.
+    *   Lógica: Inserta un registro negativo en la base de datos para anular el saldo a favor sin borrar el historial de ingresos previos.
+
+### C. Sistema de Filtros Híbrido
+*   **Filtro de Fecha (Server-Side):**
+    *   Usa parámetros URL (`?start=...&end=...`).
+    *   Recarga la página para recalcular matemáticamente el "Saldo Anterior" y mostrar el estado de cuenta exacto de ese periodo.
+*   **Filtro de Texto (Client-Side):**
+    *   Búsqueda instantánea por Descripción, Referencia o Nota sin recargar la página.
+
+## 4. Motor de Reportes e Impresión
+Se implementó una solución de impresión profesional ("Pixel-Perfect") sin librerías externas pesadas.
+
+*   **Tecnología:** `Iframe` aislado generado dinámicamente con JavaScript.
+*   **Características:**
+    *   **Limpieza:** Ignora el sidebar, menús y colores de la app. Imprime solo el documento.
+    *   **Estilos Inyectados:** Usa Tailwind vía CDN dentro del iframe para garantizar diseño idéntico al ver en pantalla.
+    *   **Formato Legal:** Incluye cabecera con datos de la clínica (Logo, NIT, Dirección), datos del paciente y tabla detallada de movimientos.
+    *   **Respeto de Filtros:** Lo que se ve en la tabla filtrada es exactamente lo que se imprime.
+
+---
+
+### ✅ Conclusión
+El módulo cumple con los estándares de un SaaS clínico: permite trazabilidad total del dinero, maneja escenarios complejos (devoluciones, abonos parciales) y genera la documentación física necesaria para el paciente.
